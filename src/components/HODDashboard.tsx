@@ -43,7 +43,7 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
 
   const stats = [
     {
-      title: "Total Faculty",
+      title: "Total Faculties",
       value: facultyCount.toString(),
       change: "+2",
       icon: Users,
