@@ -218,9 +218,10 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid grid-cols-4 w-full max-w-md">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="faculty-data">Faculty Data</TabsTrigger>
+            <TabsTrigger value="faculty-data">FDP</TabsTrigger>
             <TabsTrigger value="reports">Reports</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">

@@ -34,7 +34,7 @@ const FacultyDataView = () => {
         {fdpCertifications.map((cert, index) => (
           <Card key={index}>
             <CardHeader>
-              <CardTitle>{cert.title}</CardTitle>
+              <CardTitle class="text-lg">{cert.title}</CardTitle>
             </CardHeader>
             <CardContent>
               {/* Optional: Add more fields like cert.date, cert.organizer etc. */}
