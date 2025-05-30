@@ -1,10 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { format } from "date-fns";
@@ -27,22 +25,40 @@ const AwardsForm = () => {
     title: '',
     issuingBody: '',
     dateAwarded: undefined as Date | undefined,
-    description: '',
     certificate: null as File | null
   });
 
   const [awards, setAwards] = useState<AwardData[]>([]);
   const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    fetchAwards();
+    checkAuthAndFetchAwards();
   }, []);
 
-  const fetchAwards = async () => {
+  const checkAuthAndFetchAwards = async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) {
+        setCurrentUser(null);
+        setAwards([]);
+        return;
+      }
+      setCurrentUser(user);
+      await fetchAwards(user.id);
+    } catch (error) {
+      setCurrentUser(null);
+      setAwards([]);
+    }
+  };
+
+  const fetchAwards = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('awards')
         .select('*')
+        .eq('user_id', userId)
         .order('date_awarded', { ascending: false });
 
       if (error) throw error;
@@ -58,7 +74,7 @@ const AwardsForm = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!formData.title || !formData.issuingBody || !formData.dateAwarded) {
       toast({
         title: "Please fill all required fields",
@@ -70,16 +86,15 @@ const AwardsForm = () => {
     setLoading(true);
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
+      if (!currentUser) throw new Error('User not authenticated');
 
       let certificateUrl = null;
 
       // Upload certificate if provided
       if (formData.certificate) {
         const fileExt = formData.certificate.name.split('.').pop();
-        const fileName = `${user.id}/awards/${Date.now()}.${fileExt}`;
-        
+        const fileName = `${currentUser.id}/awards/${Date.now()}.${fileExt}`;
+
         const { error: uploadError } = await supabase.storage
           .from('academic-files')
           .upload(fileName, formData.certificate);
@@ -96,7 +111,7 @@ const AwardsForm = () => {
       const { error } = await supabase
         .from('awards')
         .insert({
-          user_id: user.id,
+          user_id: currentUser.id,
           title: formData.title,
           issuing_body: formData.issuingBody,
           date_awarded: format(formData.dateAwarded, "yyyy-MM-dd"),
@@ -109,11 +124,10 @@ const AwardsForm = () => {
         title: '',
         issuingBody: '',
         dateAwarded: undefined,
-        description: '',
         certificate: null
       });
 
-      await fetchAwards();
+      await fetchAwards(currentUser.id);
 
       toast({
         title: "Award Added",
@@ -135,12 +149,6 @@ const AwardsForm = () => {
     if (file) {
       setFormData({ ...formData, certificate: file });
     }
-  };
-
-  const getCategoryFromTitle = (title: string) => {
-    if (title.toLowerCase().includes('teaching')) return "Teaching";
-    if (title.toLowerCase().includes('research')) return "Research";
-    return "Other";
   };
 
   return (
@@ -262,14 +270,6 @@ const AwardsForm = () => {
                 <div key={award.id} className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-start justify-between">
                     <h4 className="font-medium text-gray-900">{award.title}</h4>
-                    <span className={cn(
-                      "px-2 py-1 text-xs rounded-full",
-                      getCategoryFromTitle(award.title) === "Research" ? "bg-blue-100 text-blue-800" :
-                      getCategoryFromTitle(award.title) === "Teaching" ? "bg-green-100 text-green-800" :
-                      "bg-purple-100 text-purple-800"
-                    )}>
-                      {getCategoryFromTitle(award.title)}
-                    </span>
                   </div>
                   <p className="text-sm text-gray-600">{award.issuing_body}</p>
                   <p className="text-xs text-gray-500">

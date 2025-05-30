@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,39 +8,50 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, Plus, BookOpen, FileText, Video, Code, PenTool } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
 
 const TeachingMaterialForm = () => {
   const [formData, setFormData] = useState({
     title: '',
-    course: '',
+    courseCode: '',
+    courseName: '',
     materialType: '',
     description: '',
     file: null as File | null
   });
 
-  const [materials, setMaterials] = useState([
-    {
-      id: 1,
-      title: "Data Structures - Linked Lists",
-      course: "CS201 - Data Structures",
-      type: "PPT",
-      uploadDate: "2024-03-15",
-      size: "2.5 MB"
-    },
-    {
-      id: 2,
-      title: "Database Normalization Tutorial",
-      course: "CS301 - DBMS",
-      type: "Video",
-      uploadDate: "2024-03-10",
-      size: "45.2 MB"
-    }
-  ]);
+  const [materials, setMaterials] = useState<any[]>([]);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    checkAuthAndFetchMaterials();
+  }, []);
+
+  const checkAuthAndFetchMaterials = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) {
+      setCurrentUser(null);
+      setMaterials([]);
+      return;
+    }
+    setCurrentUser(user);
+    await fetchMaterials(user.id);
+  };
+
+  const fetchMaterials = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('teaching_materials')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (!error) setMaterials(data || []);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.title || !formData.course || !formData.materialType) {
+
+    if (!formData.title || !formData.courseCode || !formData.courseName || !formData.materialType) {
       toast({
         title: "Please fill all required fields",
         variant: "destructive",
@@ -49,28 +59,64 @@ const TeachingMaterialForm = () => {
       return;
     }
 
-    const newMaterial = {
-      id: materials.length + 1,
-      title: formData.title,
-      course: formData.course,
-      type: formData.materialType,
-      uploadDate: new Date().toISOString().split('T')[0],
-      size: formData.file ? `${(formData.file.size / (1024 * 1024)).toFixed(1)} MB` : "N/A"
-    };
+    try {
+      if (!currentUser) throw new Error('User not authenticated');
 
-    setMaterials([newMaterial, ...materials]);
-    setFormData({
-      title: '',
-      course: '',
-      materialType: '',
-      description: '',
-      file: null
-    });
+      let fileUrl = null;
 
-    toast({
-      title: "Teaching Material Added",
-      description: "Your teaching material has been uploaded successfully.",
-    });
+      if (formData.file) {
+        const fileExt = formData.file.name.split('.').pop();
+        const fileName = `${currentUser.id}/teaching-materials/${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('academic-files')
+          .upload(fileName, formData.file);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('academic-files')
+          .getPublicUrl(fileName);
+
+        fileUrl = publicUrl;
+      }
+
+      const { error } = await supabase
+        .from('teaching_materials')
+        .insert({
+          user_id: currentUser.id,
+          title: formData.title,
+          course_code: formData.courseCode,
+          course_name: formData.courseName,
+          material_type: formData.materialType,
+          file_url: fileUrl,
+          description: formData.description
+        });
+
+      if (error) throw error;
+
+      setFormData({
+        title: '',
+        courseCode: '',
+        courseName: '',
+        materialType: '',
+        description: '',
+        file: null
+      });
+
+      await fetchMaterials(currentUser.id);
+
+      toast({
+        title: "Teaching Material Added",
+        description: "Your teaching material has been uploaded successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error uploading material",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -143,12 +189,22 @@ const TeachingMaterialForm = () => {
               </div>
 
               <div>
-                <Label htmlFor="course">Course *</Label>
+                <Label htmlFor="courseCode">Course Code *</Label>
                 <Input
-                  id="course"
-                  value={formData.course}
-                  onChange={(e) => setFormData({ ...formData, course: e.target.value })}
-                  placeholder="e.g., CS201 - Data Structures"
+                  id="courseCode"
+                  value={formData.courseCode}
+                  onChange={(e) => setFormData({ ...formData, courseCode: e.target.value })}
+                  placeholder="e.g., CS201"
+                  required
+                />
+              </div>
+              <div>
+                <Label htmlFor="courseName">Course Name *</Label>
+                <Input
+                  id="courseName"
+                  value={formData.courseName}
+                  onChange={(e) => setFormData({ ...formData, courseName: e.target.value })}
+                  placeholder="e.g., Data Structures"
                   required
                 />
               </div>
@@ -227,27 +283,39 @@ const TeachingMaterialForm = () => {
           <CardContent>
             <div className="space-y-4">
               {materials.map((material) => {
-                const TypeIcon = getTypeIcon(material.type);
+                const TypeIcon = getTypeIcon(material.material_type);
                 return (
                   <div key={material.id} className="border rounded-lg p-4 space-y-2">
                     <div className="flex items-start justify-between">
                       <div className="flex items-start space-x-3">
-                        <div className={cn("p-2 rounded-lg", getTypeColor(material.type))}>
+                        <div className={cn("p-2 rounded-lg", getTypeColor(material.material_type))}>
                           <TypeIcon className="h-4 w-4" />
                         </div>
                         <div>
                           <h4 className="font-medium text-gray-900">{material.title}</h4>
-                          <p className="text-sm text-gray-600">{material.course}</p>
+                          <p className="text-sm text-gray-600">{material.course_code} - {material.course_name}</p>
                         </div>
                       </div>
-                      <span className={cn("px-2 py-1 text-xs rounded-full", getTypeColor(material.type))}>
-                        {material.type}
+                      <span className={cn("px-2 py-1 text-xs rounded-full", getTypeColor(material.material_type))}>
+                        {material.material_type}
                       </span>
                     </div>
                     <div className="flex justify-between text-xs text-gray-500 pt-2">
-                      <span>Uploaded: {material.uploadDate}</span>
-                      <span>Size: {material.size}</span>
+                      <span>Uploaded: {material.created_at ? material.created_at.split('T')[0] : ''}</span>
+                      {material.file_url && (
+                        <a
+                          href={material.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:text-blue-800"
+                        >
+                          View File
+                        </a>
+                      )}
                     </div>
+                    {material.description && (
+                      <div className="text-xs text-gray-700 pt-1">{material.description}</div>
+                    )}
                   </div>
                 );
               })}

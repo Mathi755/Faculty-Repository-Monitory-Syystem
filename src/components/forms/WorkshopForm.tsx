@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +9,17 @@ import { format } from "date-fns";
 import { CalendarIcon, Upload, Plus, Calendar as CalendarEventIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+interface Workshop {
+  id: string;
+  event_name: string;
+  organizer: string;
+  duration_from: string;
+  duration_to: string;
+  certificate_url: string | null;
+  created_at: string;
+}
 
 const WorkshopForm = () => {
   const [formData, setFormData] = useState({
@@ -20,27 +30,54 @@ const WorkshopForm = () => {
     certificate: null as File | null
   });
 
-  const [workshops, setWorkshops] = useState([
-    {
-      id: 1,
-      name: "International Conference on AI in Education",
-      organizer: "IEEE Computer Society",
-      duration: "March 15-17, 2024",
-      type: "Conference"
-    },
-    {
-      id: 2,
-      name: "Workshop on Deep Learning Fundamentals",
-      organizer: "Indian Statistical Institute",
-      duration: "February 20-22, 2024",
-      type: "Workshop"
-    }
-  ]);
+  const [workshops, setWorkshops] = useState<Workshop[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  useEffect(() => {
+    checkAuthAndFetchWorkshops();
+  }, []);
+
+  const checkAuthAndFetchWorkshops = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession();
+      const user = session?.user;
+      if (!user) {
+        setCurrentUser(null);
+        setWorkshops([]);
+        return;
+      }
+      setCurrentUser(user);
+      await fetchWorkshops(user.id);
+    } catch (error) {
+      setCurrentUser(null);
+      setWorkshops([]);
+    }
+  };
+
+  const fetchWorkshops = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('workshops')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setWorkshops(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error fetching workshops",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!formData.eventName || !formData.organizer) {
+
+    if (!formData.eventName || !formData.organizer || !formData.fromDate || !formData.toDate) {
       toast({
         title: "Please fill all required fields",
         variant: "destructive",
@@ -48,29 +85,67 @@ const WorkshopForm = () => {
       return;
     }
 
-    const newWorkshop = {
-      id: workshops.length + 1,
-      name: formData.eventName,
-      organizer: formData.organizer,
-      duration: formData.fromDate && formData.toDate 
-        ? `${format(formData.fromDate, "MMM dd")}-${format(formData.toDate, "dd, yyyy")}`
-        : "TBD",
-      type: formData.eventName.toLowerCase().includes('conference') ? "Conference" : "Workshop"
-    };
+    setLoading(true);
 
-    setWorkshops([newWorkshop, ...workshops]);
-    setFormData({
-      eventName: '',
-      organizer: '',
-      fromDate: undefined,
-      toDate: undefined,
-      certificate: null
-    });
+    try {
+      if (!currentUser) throw new Error('User not authenticated');
 
-    toast({
-      title: "Event Added",
-      description: "Your workshop/conference attendance has been saved successfully.",
-    });
+      let certificateUrl = null;
+
+      // Upload certificate if provided
+      if (formData.certificate) {
+        const fileExt = formData.certificate.name.split('.').pop();
+        const fileName = `${currentUser.id}/workshops/${Date.now()}.${fileExt}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('academic-files')
+          .upload(fileName, formData.certificate);
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('academic-files')
+          .getPublicUrl(fileName);
+
+        certificateUrl = publicUrl;
+      }
+
+      const { error } = await supabase
+        .from('workshops')
+        .insert({
+          user_id: currentUser.id,
+          event_name: formData.eventName,
+          organizer: formData.organizer,
+          duration_from: formData.fromDate.toISOString().split("T")[0],
+          duration_to: formData.toDate.toISOString().split("T")[0],
+          certificate_url: certificateUrl
+        });
+
+      if (error) throw error;
+
+      setFormData({
+        eventName: '',
+        organizer: '',
+        fromDate: undefined,
+        toDate: undefined,
+        certificate: null
+      });
+
+      await fetchWorkshops(currentUser.id);
+
+      toast({
+        title: "Event Added",
+        description: "Your workshop/conference attendance has been saved successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Error adding event",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -125,7 +200,7 @@ const WorkshopForm = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label>From Date</Label>
+                  <Label>From Date *</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -152,7 +227,7 @@ const WorkshopForm = () => {
                 </div>
 
                 <div>
-                  <Label>To Date</Label>
+                  <Label>To Date *</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -204,8 +279,8 @@ const WorkshopForm = () => {
                 </div>
               </div>
 
-              <Button type="submit" className="w-full">
-                Add Event
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Adding..." : "Add Event"}
               </Button>
             </form>
           </CardContent>
@@ -227,16 +302,30 @@ const WorkshopForm = () => {
               {workshops.map((workshop) => (
                 <div key={workshop.id} className="border rounded-lg p-4 space-y-2">
                   <div className="flex items-start justify-between">
-                    <h4 className="font-medium text-gray-900">{workshop.name}</h4>
+                    <h4 className="font-medium text-gray-900">{workshop.event_name}</h4>
                     <span className={cn(
                       "px-2 py-1 text-xs rounded-full",
-                      workshop.type === "Conference" ? "bg-purple-100 text-purple-800" : "bg-blue-100 text-blue-800"
+                      "bg-blue-100 text-blue-800"
                     )}>
-                      {workshop.type}
+                      {new Date(workshop.duration_to).getTime() - new Date(workshop.duration_from).getTime() > 2 * 24 * 60 * 60 * 1000
+                        ? "Conference"
+                        : "Workshop"}
                     </span>
                   </div>
                   <p className="text-sm text-gray-600">{workshop.organizer}</p>
-                  <p className="text-xs text-gray-500">Duration: {workshop.duration}</p>
+                  <p className="text-xs text-gray-500">
+                    Duration: {format(new Date(workshop.duration_from), "MMM dd, yyyy")} - {format(new Date(workshop.duration_to), "MMM dd, yyyy")}
+                  </p>
+                  {workshop.certificate_url && (
+                    <a
+                      href={workshop.certificate_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:text-blue-800"
+                    >
+                      View Certificate
+                    </a>
+                  )}
                 </div>
               ))}
               {workshops.length === 0 && (

@@ -1,5 +1,5 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,6 +9,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Users, GraduationCap } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+
+interface StudentProject {
+  id: string;
+  project_title: string;
+  project_type: string;
+  students_involved: string[];
+  semester: string | null;
+  department: string | null;
+  description: string | null;
+  status: string;
+  created_at: string;
+}
 
 const StudentProjectForm = () => {
   const [formData, setFormData] = useState({
@@ -21,73 +33,97 @@ const StudentProjectForm = () => {
     status: 'Ongoing'
   });
 
-  const [studentProjects, setStudentProjects] = useState([
-    {
-      id: 1,
-      title: "E-Learning Platform with AI Recommendations",
-      type: "Major Project",
-      students: ["Raj Patel", "Priya Sharma", "Amit Kumar"],
-      semester: "8th Semester",
-      status: "Completed"
-    },
-    {
-      id: 2,
-      title: "Mobile Health Monitoring App",
-      type: "Minor Project",
-      students: ["Sarah Johnson", "Mike Chen"],
-      semester: "6th Semester",
-      status: "Ongoing"
-    }
-  ]);
+  const [studentProjects, setStudentProjects] = useState<StudentProject[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.projectTitle || !formData.projectType || !formData.studentNames) {
-      toast({
-        title: "Please fill all required fields",
-        variant: "destructive",
-      });
+  useEffect(() => {
+    checkAuthAndFetchProjects();
+  }, []);
+
+  const checkAuthAndFetchProjects = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user;
+    if (!user) {
+      setCurrentUser(null);
+      setStudentProjects([]);
       return;
     }
-
-    const studentArray = formData.studentNames.split(',').map(name => name.trim()).filter(name => name);
-
-    const newProject = {
-      id: studentProjects.length + 1,
-      title: formData.projectTitle,
-      type: formData.projectType,
-      students: studentArray,
-      semester: formData.semester,
-      status: formData.status
-    };
-
-    setStudentProjects([newProject, ...studentProjects]);
-    setFormData({
-      projectTitle: '',
-      projectType: '',
-      studentNames: '',
-      semester: '',
-      department: '',
-      description: '',
-      status: 'Ongoing'
-    });
-
-    toast({
-      title: "Student Project Added",
-      description: "The student project has been saved successfully.",
-    });
+    setCurrentUser(user);
+    await fetchProjects(user.id);
   };
 
+  const fetchProjects = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('student_projects')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+    if (!error) {
+      setStudentProjects(
+        (data || []).map((item: any) => ({
+          id: item.id,
+          project_title: item.project_title,
+          project_type: item.project_type,
+          students_involved: item.students_involved,
+          semester: item.semester ?? null,
+          department: item.department ?? null,
+          description: item.description ?? null,
+          status: item.status ?? "Ongoing",
+          created_at: item.created_at,
+        }))
+      );
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.projectTitle || !formData.projectType || !formData.studentNames) {
+      toast({ title: "Please fill all required fields", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      if (!currentUser) throw new Error('User not authenticated');
+      const studentArray = formData.studentNames.split(',').map(name => name.trim()).filter(name => name);
+      const { error } = await supabase
+        .from('student_projects')
+        .insert({
+          // Remove user_id if not in your table schema, or add it to your Supabase table if needed
+          // user_id: currentUser.id,
+          project_title: formData.projectTitle,
+          project_type: formData.projectType as "External" | "In-house" | "Mini" | "Minor" | "Major",
+          students_involved: studentArray,
+          description: formData.description,
+          status: formData.status
+        });
+      if (error) throw error;
+      setFormData({
+        projectTitle: '',
+        projectType: '',
+        studentNames: '',
+        semester: '',
+        department: '',
+        description: '',
+        status: 'Ongoing'
+      });
+      await fetchProjects(currentUser.id);
+      toast({ title: "Student Project Added", description: "The student project has been saved successfully." });
+    } catch (error: any) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+  // Match these to your Supabase enum: "Major", "Minor", "Mini", "External", "In-house"
   const projectTypes = [
-    "Major Project",
-    "Minor Project", 
-    "Mini Project",
-    "External Project",
-    "In-house Project",
-    "Research Project",
-    "Internship Project"
+    "Major",
+    "Minor",
+    "Mini",
+    "External",
+    "In-house"
   ];
+  
 
   return (
     <div className="space-y-6">
@@ -196,8 +232,8 @@ const StudentProjectForm = () => {
                 />
               </div>
 
-              <Button type="submit" className="w-full">
-                Add Student Project
+              <Button type="submit" className="w-full" disabled={loading}>
+                {loading ? "Adding Project..." : "Add Student Project"}
               </Button>
             </form>
           </CardContent>
@@ -219,7 +255,7 @@ const StudentProjectForm = () => {
               {studentProjects.map((project) => (
                 <div key={project.id} className="border rounded-lg p-4 space-y-3">
                   <div className="flex items-start justify-between">
-                    <h4 className="font-medium text-gray-900">{project.title}</h4>
+                    <h4 className="font-medium text-gray-900">{project.project_title}</h4>
                     <span className={cn(
                       "px-2 py-1 text-xs rounded-full",
                       project.status === "Completed" ? "bg-green-100 text-green-800" :
@@ -232,10 +268,10 @@ const StudentProjectForm = () => {
                   
                   <div className="flex items-center space-x-2">
                     <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded">
-                      {project.type}
+                      {project.project_type}
                     </span>
-                    {project.semester && (
-                      <span className="text-xs text-gray-500">{project.semester}</span>
+                   <h3 className="font-medium text-black-900">Semester :</h3> {project.semester && (
+                      <span className="text-xs text-black-800">{project.semester}</span>
                     )}
                   </div>
 
@@ -245,7 +281,7 @@ const StudentProjectForm = () => {
                       <span className="text-sm text-gray-600">Students:</span>
                     </div>
                     <div className="flex flex-wrap gap-1">
-                      {project.students.map((student, index) => (
+                      {project.students_involved.map((student, index) => (
                         <span key={index} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
                           {student}
                         </span>
