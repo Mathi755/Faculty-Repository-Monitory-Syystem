@@ -36,30 +36,57 @@ const StudentProjectForm = () => {
   const [studentProjects, setStudentProjects] = useState<StudentProject[]>([]);
   const [loading, setLoading] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     checkAuthAndFetchProjects();
   }, []);
 
   const checkAuthAndFetchProjects = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const user = session?.user;
-    if (!user) {
+    try {
+      setIsInitializing(true);
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error('Session error:', sessionError);
+        setCurrentUser(null);
+        setStudentProjects([]);
+        return;
+      }
+
+      const user = session?.user;
+      if (!user) {
+        console.warn('No authenticated user found');
+        setCurrentUser(null);
+        setStudentProjects([]);
+        return;
+      }
+
+      console.log('Authenticated user:', user.id);
+      setCurrentUser(user);
+      await fetchProjects(user.id);
+    } catch (error) {
+      console.error('Error in checkAuthAndFetchProjects:', error);
       setCurrentUser(null);
       setStudentProjects([]);
-      return;
+    } finally {
+      setIsInitializing(false);
     }
-    setCurrentUser(user);
-    await fetchProjects(user.id);
   };
 
   const fetchProjects = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('student_projects')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-    if (!error) {
+    try {
+      const { data, error } = await supabase
+        .from('student_projects')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('Error fetching student projects:', error);
+        throw error;
+      }
+      
       setStudentProjects(
         (data || []).map((item: any) => ({
           id: item.id,
@@ -73,31 +100,88 @@ const StudentProjectForm = () => {
           created_at: item.created_at,
         }))
       );
+    } catch (error: any) {
+      toast({
+        title: "Error fetching projects",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.projectTitle || !formData.projectType || !formData.studentNames) {
-      toast({ title: "Please fill all required fields", variant: "destructive" });
+    
+    // Enhanced validation
+    if (!currentUser) {
+      toast({
+        title: "Authentication Error",
+        description: "Please log in to add a student project",
+        variant: "destructive",
+      });
       return;
     }
+
+    if (!currentUser.id) {
+      toast({
+        title: "User ID Error",
+        description: "Unable to identify user. Please try logging in again.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!formData.projectTitle || !formData.projectType || !formData.studentNames) {
+      toast({
+        title: "Validation Error", 
+        description: "Please fill all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setLoading(true);
     try {
-      if (!currentUser) throw new Error('User not authenticated');
-      const studentArray = formData.studentNames.split(',').map(name => name.trim()).filter(name => name);
+      console.log('Submitting student project for user:', currentUser.id);
+
+      const studentArray = formData.studentNames
+        .split(',')
+        .map(name => name.trim())
+        .filter(name => name);
+
+      if (studentArray.length === 0) {
+        toast({
+          title: "Validation Error",
+          description: "Please enter at least one student name",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Prepare insert data with required user_id
+      const insertData = {
+        user_id: currentUser.id, // This is required by the table schema
+        project_title: formData.projectTitle.trim(),
+        project_type: formData.projectType,
+        students_involved: studentArray,
+        semester: formData.semester.trim() || null,
+        department: formData.department.trim() || null,
+        description: formData.description.trim() || null,
+        status: formData.status
+      };
+
+      console.log('Insert data:', insertData);
+
       const { error } = await supabase
         .from('student_projects')
-        .insert({
-          // Remove user_id if not in your table schema, or add it to your Supabase table if needed
-          // user_id: currentUser.id,
-          project_title: formData.projectTitle,
-          project_type: formData.projectType as "External" | "In-house" | "Mini" | "Minor" | "Major",
-          students_involved: studentArray,
-          description: formData.description,
-          status: formData.status
-        });
-      if (error) throw error;
+        .insert(insertData);
+      
+      if (error) {
+        console.error('Database insert error:', error);
+        throw error;
+      }
+
+      // Reset form
       setFormData({
         projectTitle: '',
         projectType: '',
@@ -107,23 +191,55 @@ const StudentProjectForm = () => {
         description: '',
         status: 'Ongoing'
       });
+
       await fetchProjects(currentUser.id);
-      toast({ title: "Student Project Added", description: "The student project has been saved successfully." });
+      
+      toast({
+        title: "Student Project Added",
+        description: "The student project has been saved successfully."
+      });
     } catch (error: any) {
-      toast({ title: "Error", description: error.message, variant: "destructive" });
+      console.error('Error adding student project:', error);
+      toast({
+        title: "Error",
+        description: error.message || "An unexpected error occurred",
+        variant: "destructive"
+      });
     } finally {
       setLoading(false);
     }
   };
-  // Match these to your Supabase enum: "Major", "Minor", "Mini", "External", "In-house"
+
+  // Match these to your project types
   const projectTypes = [
     "Major",
-    "Minor",
+    "Minor", 
     "Mini",
     "External",
     "In-house"
   ];
-  
+
+  // Show loading state while initializing
+  if (isInitializing) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <p className="text-gray-500">Loading your student projects...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authentication error if no user
+  if (!currentUser) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-8">
+          <p className="text-gray-500">Please log in to manage student projects.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -270,10 +386,19 @@ const StudentProjectForm = () => {
                     <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded">
                       {project.project_type}
                     </span>
-                   <h3 className="font-medium text-black-900">Semester :</h3> {project.semester && (
-                      <span className="text-xs text-black-800">{project.semester}</span>
+                    {project.semester && (
+                      <>
+                        <span className="text-sm font-medium text-gray-900">Semester:</span>
+                        <span className="text-sm text-gray-600">{project.semester}</span>
+                      </>
                     )}
                   </div>
+
+                  {project.department && (
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">Department:</span> {project.department}
+                    </div>
+                  )}
 
                   <div className="space-y-1">
                     <div className="flex items-center space-x-2">
@@ -288,6 +413,12 @@ const StudentProjectForm = () => {
                       ))}
                     </div>
                   </div>
+
+                  {project.description && (
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">Description:</span> {project.description}
+                    </div>
+                  )}
                 </div>
               ))}
               {studentProjects.length === 0 && (
