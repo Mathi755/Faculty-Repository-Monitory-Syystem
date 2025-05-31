@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { User } from "@supabase/supabase-js";
 import { GraduationCap } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface AuthProps {
   onAuthChange: (user: User | null) => void;
@@ -19,6 +20,7 @@ const Auth = ({ onAuthChange }: AuthProps) => {
   const [password, setPassword] = useState("");
   const [fullName, setFullName] = useState("");
   const [isLoaded, setIsLoaded] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // Animation delay for card
@@ -103,6 +105,14 @@ const Auth = ({ onAuthChange }: AuthProps) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-900 via-purple-900 via-pink-800 to-orange-700 relative overflow-hidden">
+      {/* Back Button */}
+      <button
+        onClick={() => navigate("/")}
+        className="absolute top-6 left-6 z-20 bg-white/80 hover:bg-white text-blue-700 font-medium px-4 py-2 rounded-lg shadow transition"
+        type="button"
+      >
+        ← Back to Home
+      </button>
       {/* Space gradient background with stars and nebula effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-black/10" />
@@ -151,7 +161,7 @@ const Auth = ({ onAuthChange }: AuthProps) => {
               </div>
               <CardTitle>
                 <span className="block text-3xl md:text-4xl font-black text-gray-900 mb-2 tracking-tight bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                  University Portal
+                  Faculty Repository
                 </span>
               </CardTitle>
               <CardDescription className="text-gray-600">
