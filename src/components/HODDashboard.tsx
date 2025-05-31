@@ -24,7 +24,14 @@ import {
 } from "lucide-react";
 import FacultyDataView from "@/components/hod/FacultyDataView";
 import ReportsGeneration from "@/components/hod/ReportsGeneration";
-import AnalyticsDashboard from "@/components/hod/AnalyticsDashboard";
+import AwardsDashboard from "@/components/hod/AwardsDashboard";
+import PatentsDashboard from   "@/components/hod/PatentsDashboard";
+import PublicationsDashboard from "@/components/hod/PublicationsDashboard";
+import WorkshopsDashboard from "@/components/hod/WorkshopsDashboard";
+import MembershipDashboard from "@/components/hod/MembershipDashboard";
+import TimetableDashboard from "@/components/hod/TimetableDashboard";
+import StudentsDashboard from "@/components/hod/StudentsDashboard";
+import MaterialsDashboard from "@/components/hod/MaterialsDashboard";
 
 interface HODDashboardProps {
   onLogout: () => void;
@@ -398,13 +405,18 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-6 w-full max-w-md">
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsList className="grid grid-cols-11 w-full max-w-5xl">
+            <TabsTrigger value="dashboard">Overview</TabsTrigger>
             <TabsTrigger value="fdp">FDP</TabsTrigger>
+            <TabsTrigger value="publications">Publications</TabsTrigger>
             <TabsTrigger value="projects">Projects</TabsTrigger>
             <TabsTrigger value="patents">Patents</TabsTrigger>
+            <TabsTrigger value="workshops">Workshops</TabsTrigger>
             <TabsTrigger value="awards">Awards</TabsTrigger>
-            <TabsTrigger value="publications">Publications</TabsTrigger>
+            <TabsTrigger value="timetable">Timetable</TabsTrigger>
+            <TabsTrigger value="membership">Membership</TabsTrigger>
+            <TabsTrigger value="students">Students</TabsTrigger>
+            <TabsTrigger value="materials">Materials</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
@@ -521,20 +533,32 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
             <FacultyDataView />
           </TabsContent>
 
+          <TabsContent value="publications">
+            <PublicationsDashboard />
+          </TabsContent>
           <TabsContent value="projects">
             <ReportsGeneration />
           </TabsContent>
-
-          <TabsContent value="Patents">
-            <AnalyticsDashboard />
+          <TabsContent value="patents">
+            <PatentsDashboard />
           </TabsContent>
-
-          <TabsContent value="publications">
-            <AnalyticsDashboard />
+          <TabsContent value="workshops">
+            <WorkshopsDashboard />
           </TabsContent>
-
           <TabsContent value="awards">
-            <AnalyticsDashboard />
+            <AwardsDashboard />
+          </TabsContent>
+          <TabsContent value="timetable">
+            <TimetableDashboard />
+          </TabsContent>
+          <TabsContent value="membership">
+            <MembershipDashboard />
+          </TabsContent>
+          <TabsContent value="students">
+            <StudentsDashboard />
+          </TabsContent>
+          <TabsContent value="materials">
+            <MaterialsDashboard />
           </TabsContent>
 
           {/* 

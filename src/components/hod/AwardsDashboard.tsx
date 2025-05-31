@@ -1,12 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { Users, Target, Award } from "lucide-react";
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  PieChart, Pie, Cell, AreaChart, Area
-} from "recharts";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart } from 'recharts';
+import { Calendar, Award, Users, TrendingUp, Trophy, Building, Clock, Target } from 'lucide-react';
 
 interface FacultyProfile {
   id: string;
@@ -16,168 +12,176 @@ interface FacultyProfile {
   designation?: string | null;
 }
 
-interface Project {
+interface Award {
   id: string;
   user_id: string;
   title: string;
-  funding_agency: string;
-  funded_amount: number;
-  duration_from: string;
-  duration_to: string;
-  sanction_letter_url?: string | null;
-  created_at: string;
+  issuing_body: string;
+  date_awarded: string;
+  certificate_url?: string | null;
 }
 
-const ReportsGeneration = () => {
+const AwardsDashboard = () => {
   const [faculties, setFaculties] = useState<FacultyProfile[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [awards, setAwards] = useState<Award[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState('all');
 
+  // Fetch all data from Supabase
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const { data: facultyData } = await supabase
+        // Fetch faculty profiles
+        const { data: facultyData, error: facultyError } = await supabase
           .from("profiles")
           .select("id, email, full_name, department, designation");
-        const { data: projectData } = await supabase
-          .from("projects")
+        
+        if (facultyError) {
+          console.error("Error fetching faculties:", facultyError);
+          return;
+        }
+
+        // Fetch all awards
+        const { data: awardsData, error: awardsError } = await supabase
+          .from("awards")
           .select("*")
-          .order("created_at", { ascending: false });
+          .order("date_awarded", { ascending: false });
+        
+        if (awardsError) {
+          console.error("Error fetching awards:", awardsError);
+          return;
+        }
+
         setFaculties(facultyData || []);
-        setProjects(projectData || []);
+        setAwards(awardsData || []);
+      } catch (error) {
+        console.error("Error fetching data:", error);
       } finally {
         setLoading(false);
       }
     };
+
     fetchData();
   }, []);
 
-  // Analytics calculations
+  // Analytics calculations using actual data
   const getAnalytics = () => {
     if (faculties.length === 0) return null;
 
-    const filteredFaculties = selectedDepartment === 'all'
-      ? faculties
+    const filteredFaculties = selectedDepartment === 'all' 
+      ? faculties 
       : faculties.filter(f => f.department === selectedDepartment);
-
-    const filteredProjects = projects.filter(proj =>
-      filteredFaculties.some(f => f.id === proj.user_id)
+    
+    const filteredAwards = awards.filter(award => 
+      filteredFaculties.some(f => f.id === award.user_id)
     );
 
-    // By Department
+    // 1. Awards by Department
     const departments = [...new Set(faculties.map(f => f.department).filter(Boolean))];
-    const projectsByDepartment = departments.map(dept => {
+    const awardsByDepartment = departments.map(dept => {
       const deptFaculties = faculties.filter(f => f.department === dept);
-      const deptProjects = projects.filter(proj =>
-        deptFaculties.some(f => f.id === proj.user_id)
+      const deptAwards = awards.filter(award => 
+        deptFaculties.some(f => f.id === award.user_id)
       );
       return {
         department: dept || 'Unknown',
-        projects: deptProjects.length,
+        awards: deptAwards.length,
         faculty_count: deptFaculties.length,
-        avg_projects: deptFaculties.length > 0 ? (deptProjects.length / deptFaculties.length).toFixed(1) : 0
+        avg_awards: deptFaculties.length > 0 ? (deptAwards.length / deptFaculties.length).toFixed(1) : 0
       };
     });
 
-    // By Designation
+    // 2. Awards by Designation
     const designations = [...new Set(faculties.map(f => f.designation).filter(Boolean))];
-    const projectsByDesignation = designations.map(designation => {
+    const awardsByDesignation = designations.map(designation => {
       const desigFaculties = faculties.filter(f => f.designation === designation);
-      const desigProjects = projects.filter(proj =>
-        desigFaculties.some(f => f.id === proj.user_id)
+      const desigAwards = awards.filter(award => 
+        desigFaculties.some(f => f.id === award.user_id)
       );
       return {
         designation: designation || 'Unknown',
-        projects: desigProjects.length,
+        awards: desigAwards.length,
         faculty_count: desigFaculties.length
       };
     });
 
-    // Monthly Trends
-    const monthlyTrends = filteredProjects.reduce((acc, proj) => {
-      const month = proj.created_at.substring(0, 7); // YYYY-MM
+    // 3. Monthly Award Trends (last 24 months)
+    const monthlyTrends = filteredAwards.reduce((acc, award) => {
+      const month = award.date_awarded.substring(0, 7); // YYYY-MM
       acc[month] = (acc[month] || 0) + 1;
       return acc;
-    }, {} as Record<string, number>);
+    }, {});
 
     const trendData = Object.entries(monthlyTrends)
       .sort(([a], [b]) => a.localeCompare(b))
-      .slice(-24)
+      .slice(-24) // Last 24 months
       .map(([month, count]) => ({
         month: new Date(month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' }),
         monthKey: month,
-        projects: count
+        awards: count
       }));
 
-    // By Funding Agency
-    const agencies = [...new Set(filteredProjects.map(proj => proj.funding_agency))];
-    const agencyData = agencies.map(agency => ({
-      agency,
-      count: filteredProjects.filter(proj => proj.funding_agency === agency).length,
-      total_funds: filteredProjects
-        .filter(proj => proj.funding_agency === agency)
-        .reduce((sum, proj) => sum + (proj.funded_amount || 0), 0)
+    // 4. Issuing Body Analysis
+    const issuingBodies = [...new Set(filteredAwards.map(a => a.issuing_body))];
+    const bodyData = issuingBodies.map(body => ({
+      body,
+      count: filteredAwards.filter(a => a.issuing_body === body).length
     })).sort((a, b) => b.count - a.count);
 
-    // Top Performers
+    // 5. Top Performers
     const facultyPerformance = filteredFaculties.map(faculty => {
-      const facultyProjects = projects.filter(proj => proj.user_id === faculty.id);
+      const facultyAwards = awards.filter(a => a.user_id === faculty.id);
       const currentYear = new Date().getFullYear();
-      const recentProjects = facultyProjects.filter(proj =>
-        new Date(proj.created_at).getFullYear() >= currentYear - 1
+      const recentAwards = facultyAwards.filter(a => 
+        new Date(a.date_awarded).getFullYear() >= currentYear - 1
       );
+      
       return {
         ...faculty,
-        project_count: facultyProjects.length,
-        recent_projects: recentProjects.length,
-        total_funds: facultyProjects.reduce((sum, proj) => sum + (proj.funded_amount || 0), 0),
-        has_sanction: facultyProjects.filter(proj => proj.sanction_letter_url).length,
-        latest_project: facultyProjects.length > 0 ?
-          facultyProjects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at : null
+        award_count: facultyAwards.length,
+        recent_awards: recentAwards.length,
+        has_certificate: facultyAwards.filter(a => a.certificate_url).length,
+        latest_award: facultyAwards.length > 0 ? 
+          facultyAwards.sort((a, b) => new Date(b.date_awarded).getTime() - new Date(a.date_awarded).getTime())[0].date_awarded : null
       };
-    }).sort((a, b) => b.project_count - a.project_count);
+    }).sort((a, b) => b.award_count - a.award_count);
 
-    // Sanction Letter Stats
-    const sanctionStats = {
-      with_sanction: filteredProjects.filter(proj => proj.sanction_letter_url).length,
-      without_sanction: filteredProjects.filter(proj => !proj.sanction_letter_url).length,
-      total: filteredProjects.length
+    // 6. Certificate Completion Stats
+    const certificateStats = {
+      with_certificate: filteredAwards.filter(a => a.certificate_url).length,
+      without_certificate: filteredAwards.filter(a => !a.certificate_url).length,
+      total: filteredAwards.length
     };
 
-    // Yearly Trends
-    const yearlyProjects = filteredProjects.reduce((acc, proj) => {
-      const year = new Date(proj.created_at).getFullYear();
+    // 7. Award Timeline (yearly)
+    const yearlyAwards = filteredAwards.reduce((acc, award) => {
+      const year = new Date(award.date_awarded).getFullYear();
       acc[year] = (acc[year] || 0) + 1;
       return acc;
-    }, {} as Record<number, number>);
+    }, {});
 
-    const yearlyData = Object.entries(yearlyProjects)
+    const yearlyData = Object.entries(yearlyAwards)
       .sort(([a], [b]) => parseInt(a) - parseInt(b))
       .map(([year, count]) => ({
         year: parseInt(year),
-        projects: count
+        awards: count
       }));
 
-    // Total Funding
-    const totalFunding = filteredProjects.reduce((sum, proj) => sum + (proj.funded_amount || 0), 0);
-
     return {
-      departmentData: projectsByDepartment,
-      designationData: projectsByDesignation,
+      departmentData: awardsByDepartment,
+      designationData: awardsByDesignation,
       trendData,
-      agencyData,
+      bodyData,
       facultyPerformance,
-      sanctionStats,
+      certificateStats,
       yearlyData,
-      totalProjects: filteredProjects.length,
+      totalAwards: filteredAwards.length,
       totalFaculty: filteredFaculties.length,
-      avgProjectsPerFaculty: filteredFaculties.length > 0 ? (filteredProjects.length / filteredFaculties.length).toFixed(1) : '0',
-      activeFaculty: filteredFaculties.filter(f =>
-        projects.some(proj => proj.user_id === f.id)
-      ).length,
-      totalFunding
+      avgAwardsPerFaculty: filteredFaculties.length > 0 ? (filteredAwards.length / filteredFaculties.length).toFixed(1) : '0',
+      activeFaculty: filteredFaculties.filter(f => 
+        awards.some(a => a.user_id === f.id)
+      ).length
     };
   };
 
@@ -205,9 +209,9 @@ const ReportsGeneration = () => {
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Projects Report Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-800">Faculty Awards Dashboard</h1>
         {departments.length > 0 && (
-          <select
+          <select 
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}
             className="px-4 py-2 border rounded-lg"
@@ -224,11 +228,11 @@ const ReportsGeneration = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Awards</CardTitle>
+            <Trophy className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalProjects}</div>
+            <div className="text-2xl font-bold">{analytics.totalAwards}</div>
             <p className="text-xs text-muted-foreground">Across all faculties</p>
           </CardContent>
         </Card>
@@ -240,40 +244,45 @@ const ReportsGeneration = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.totalFaculty}</div>
-            <p className="text-xs text-muted-foreground">{analytics.activeFaculty} with projects</p>
+            <p className="text-xs text-muted-foreground">{analytics.activeFaculty} with awards</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Projects/Faculty</CardTitle>
+            <CardTitle className="text-sm font-medium">Avg Awards/Faculty</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.avgProjectsPerFaculty}</div>
+            <div className="text-2xl font-bold">{analytics.avgAwardsPerFaculty}</div>
             <p className="text-xs text-muted-foreground">Performance metric</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Funding</CardTitle>
+            <CardTitle className="text-sm font-medium">Certificate Rate</CardTitle>
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{analytics.totalFunding.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Sum of all projects</p>
+            <div className="text-2xl font-bold">
+              {analytics.totalAwards > 0 ? 
+                ((analytics.certificateStats.with_certificate / analytics.totalAwards) * 100).toFixed(0) : '0'}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {analytics.certificateStats.with_certificate}/{analytics.totalAwards} with certificates
+            </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Projects by Department */}
+        {/* Awards by Department */}
         {analytics.departmentData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Projects by Department</CardTitle>
+              <CardTitle>Awards by Department</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -283,7 +292,7 @@ const ReportsGeneration = () => {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="projects" fill="#8884d8" name="Projects" />
+                  <Bar dataKey="awards" fill="#8884d8" name="Awards" />
                   <Bar dataKey="faculty_count" fill="#82ca9d" name="Faculty Count" />
                 </BarChart>
               </ResponsiveContainer>
@@ -291,11 +300,11 @@ const ReportsGeneration = () => {
           </Card>
         )}
 
-        {/* Projects by Designation */}
+        {/* Awards by Designation */}
         {analytics.designationData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Projects by Designation</CardTitle>
+              <CardTitle>Awards by Designation</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -305,10 +314,10 @@ const ReportsGeneration = () => {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ designation, projects }) => `${designation}: ${projects}`}
+                    label={({ designation, awards }) => `${designation}: ${awards}`}
                     outerRadius={80}
                     fill="#8884d8"
-                    dataKey="projects"
+                    dataKey="awards"
                   >
                     {analytics.designationData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -325,34 +334,34 @@ const ReportsGeneration = () => {
         {analytics.trendData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Project Trends (Monthly)</CardTitle>
+              <CardTitle>Award Trends (Monthly)</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <AreaChart data={analytics.trendData}>
+                <LineChart data={analytics.trendData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip />
-                  <Area type="monotone" dataKey="projects" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
-                </AreaChart>
+                  <Area type="monotone" dataKey="awards" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+                </LineChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
         )}
 
-        {/* By Funding Agency */}
-        {analytics.agencyData.length > 0 && (
+        {/* Issuing Bodies */}
+        {analytics.bodyData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Projects by Funding Agency</CardTitle>
+              <CardTitle>Awards by Issuing Body</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={analytics.agencyData.slice(0, 10)} layout="horizontal">
+                <BarChart data={analytics.bodyData.slice(0, 10)} layout="horizontal">
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
-                  <YAxis dataKey="agency" type="category" width={100} />
+                  <YAxis dataKey="body" type="category" width={100} />
                   <Tooltip />
                   <Bar dataKey="count" fill="#ffc658" />
                 </BarChart>
@@ -362,11 +371,11 @@ const ReportsGeneration = () => {
         )}
       </div>
 
-      {/* Yearly Projects Trend */}
+      {/* Yearly Awards Trend */}
       {analytics.yearlyData.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Yearly Project Trends</CardTitle>
+            <CardTitle>Yearly Award Trends</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -375,7 +384,7 @@ const ReportsGeneration = () => {
                 <XAxis dataKey="year" />
                 <YAxis />
                 <Tooltip />
-                <Area type="monotone" dataKey="projects" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
+                <Area type="monotone" dataKey="awards" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
@@ -386,7 +395,7 @@ const ReportsGeneration = () => {
       {analytics.facultyPerformance.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Faculty Project Overview</CardTitle>
+            <CardTitle>Faculty Performance Overview</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -397,11 +406,10 @@ const ReportsGeneration = () => {
                     <th className="text-left p-2">Name</th>
                     <th className="text-left p-2">Department</th>
                     <th className="text-left p-2">Designation</th>
-                    <th className="text-right p-2">Total Projects</th>
-                    <th className="text-right p-2">Recent Projects</th>
-                    <th className="text-right p-2">Total Funding</th>
-                    <th className="text-right p-2">With Sanction</th>
-                    <th className="text-left p-2">Latest Project</th>
+                    <th className="text-right p-2">Total Awards</th>
+                    <th className="text-right p-2">Recent Awards</th>
+                    <th className="text-right p-2">With Certificates</th>
+                    <th className="text-left p-2">Latest Award</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -411,12 +419,11 @@ const ReportsGeneration = () => {
                       <td className="p-2 font-medium">{faculty.full_name || faculty.email}</td>
                       <td className="p-2">{faculty.department || 'N/A'}</td>
                       <td className="p-2">{faculty.designation || 'N/A'}</td>
-                      <td className="p-2 text-right font-semibold text-blue-600">{faculty.project_count}</td>
-                      <td className="p-2 text-right">{faculty.recent_projects}</td>
-                      <td className="p-2 text-right">₹{faculty.total_funds.toLocaleString()}</td>
-                      <td className="p-2 text-right">{faculty.has_sanction}</td>
+                      <td className="p-2 text-right font-semibold text-blue-600">{faculty.award_count}</td>
+                      <td className="p-2 text-right">{faculty.recent_awards}</td>
+                      <td className="p-2 text-right">{faculty.has_certificate}</td>
                       <td className="p-2 text-sm text-gray-600">
-                        {faculty.latest_project ? new Date(faculty.latest_project).toLocaleDateString() : 'N/A'}
+                        {faculty.latest_award ? new Date(faculty.latest_award).toLocaleDateString() : 'N/A'}
                       </td>
                     </tr>
                   ))}
@@ -428,12 +435,12 @@ const ReportsGeneration = () => {
       )}
 
       {/* No Data Message */}
-      {analytics.totalProjects === 0 && (
+      {analytics.totalAwards === 0 && (
         <Card>
           <CardContent className="text-center py-8">
             <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">No Projects Data Available</h3>
-            <p className="text-gray-500">Add some projects to see detailed analytics.</p>
+            <h3 className="text-lg font-semibold text-gray-600 mb-2">No Awards Data Available</h3>
+            <p className="text-gray-500">Add some awards to faculty members to see detailed analytics.</p>
           </CardContent>
         </Card>
       )}
@@ -441,4 +448,4 @@ const ReportsGeneration = () => {
   );
 };
 
-export default ReportsGeneration;
+export default AwardsDashboard;

@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { Users, Target, Award } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
 } from "recharts";
+import { Users, Target, Award } from "lucide-react";
 
 interface FacultyProfile {
   id: string;
@@ -16,21 +15,20 @@ interface FacultyProfile {
   designation?: string | null;
 }
 
-interface Project {
+interface Membership {
   id: string;
   user_id: string;
-  title: string;
-  funding_agency: string;
-  funded_amount: number;
-  duration_from: string;
-  duration_to: string;
-  sanction_letter_url?: string | null;
+  professional_body_name: string;
+  membership_id: string;
+  expiry_date?: string | null;
+  certificate_url?: string | null;
+  full_name?: string | null;
   created_at: string;
 }
 
-const ReportsGeneration = () => {
+const MembershipDashboard = () => {
   const [faculties, setFaculties] = useState<FacultyProfile[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [memberships, setMemberships] = useState<Membership[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState('all');
 
@@ -41,12 +39,12 @@ const ReportsGeneration = () => {
         const { data: facultyData } = await supabase
           .from("profiles")
           .select("id, email, full_name, department, designation");
-        const { data: projectData } = await supabase
-          .from("projects")
+        const { data: membershipData } = await supabase
+          .from("memberships")
           .select("*")
           .order("created_at", { ascending: false });
         setFaculties(facultyData || []);
-        setProjects(projectData || []);
+        setMemberships(membershipData || []);
       } finally {
         setLoading(false);
       }
@@ -62,42 +60,42 @@ const ReportsGeneration = () => {
       ? faculties
       : faculties.filter(f => f.department === selectedDepartment);
 
-    const filteredProjects = projects.filter(proj =>
-      filteredFaculties.some(f => f.id === proj.user_id)
+    const filteredMemberships = memberships.filter(mem =>
+      filteredFaculties.some(f => f.id === mem.user_id)
     );
 
     // By Department
     const departments = [...new Set(faculties.map(f => f.department).filter(Boolean))];
-    const projectsByDepartment = departments.map(dept => {
+    const membershipsByDepartment = departments.map(dept => {
       const deptFaculties = faculties.filter(f => f.department === dept);
-      const deptProjects = projects.filter(proj =>
-        deptFaculties.some(f => f.id === proj.user_id)
+      const deptMemberships = memberships.filter(mem =>
+        deptFaculties.some(f => f.id === mem.user_id)
       );
       return {
         department: dept || 'Unknown',
-        projects: deptProjects.length,
+        memberships: deptMemberships.length,
         faculty_count: deptFaculties.length,
-        avg_projects: deptFaculties.length > 0 ? (deptProjects.length / deptFaculties.length).toFixed(1) : 0
+        avg_memberships: deptFaculties.length > 0 ? (deptMemberships.length / deptFaculties.length).toFixed(1) : 0
       };
     });
 
     // By Designation
     const designations = [...new Set(faculties.map(f => f.designation).filter(Boolean))];
-    const projectsByDesignation = designations.map(designation => {
+    const membershipsByDesignation = designations.map(designation => {
       const desigFaculties = faculties.filter(f => f.designation === designation);
-      const desigProjects = projects.filter(proj =>
-        desigFaculties.some(f => f.id === proj.user_id)
+      const desigMemberships = memberships.filter(mem =>
+        desigFaculties.some(f => f.id === mem.user_id)
       );
       return {
         designation: designation || 'Unknown',
-        projects: desigProjects.length,
+        memberships: desigMemberships.length,
         faculty_count: desigFaculties.length
       };
     });
 
     // Monthly Trends
-    const monthlyTrends = filteredProjects.reduce((acc, proj) => {
-      const month = proj.created_at.substring(0, 7); // YYYY-MM
+    const monthlyTrends = filteredMemberships.reduce((acc, mem) => {
+      const month = mem.created_at.substring(0, 7); // YYYY-MM
       acc[month] = (acc[month] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -108,76 +106,68 @@ const ReportsGeneration = () => {
       .map(([month, count]) => ({
         month: new Date(month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' }),
         monthKey: month,
-        projects: count
+        memberships: count
       }));
 
-    // By Funding Agency
-    const agencies = [...new Set(filteredProjects.map(proj => proj.funding_agency))];
-    const agencyData = agencies.map(agency => ({
-      agency,
-      count: filteredProjects.filter(proj => proj.funding_agency === agency).length,
-      total_funds: filteredProjects
-        .filter(proj => proj.funding_agency === agency)
-        .reduce((sum, proj) => sum + (proj.funded_amount || 0), 0)
+    // By Professional Body
+    const bodies = [...new Set(filteredMemberships.map(mem => mem.professional_body_name))];
+    const bodyData = bodies.map(body => ({
+      body,
+      count: filteredMemberships.filter(mem => mem.professional_body_name === body).length
     })).sort((a, b) => b.count - a.count);
 
     // Top Performers
     const facultyPerformance = filteredFaculties.map(faculty => {
-      const facultyProjects = projects.filter(proj => proj.user_id === faculty.id);
+      const facultyMemberships = memberships.filter(mem => mem.user_id === faculty.id);
       const currentYear = new Date().getFullYear();
-      const recentProjects = facultyProjects.filter(proj =>
-        new Date(proj.created_at).getFullYear() >= currentYear - 1
+      const recentMemberships = facultyMemberships.filter(mem =>
+        new Date(mem.created_at).getFullYear() >= currentYear - 1
       );
       return {
         ...faculty,
-        project_count: facultyProjects.length,
-        recent_projects: recentProjects.length,
-        total_funds: facultyProjects.reduce((sum, proj) => sum + (proj.funded_amount || 0), 0),
-        has_sanction: facultyProjects.filter(proj => proj.sanction_letter_url).length,
-        latest_project: facultyProjects.length > 0 ?
-          facultyProjects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at : null
+        membership_count: facultyMemberships.length,
+        recent_memberships: recentMemberships.length,
+        has_certificate: facultyMemberships.filter(mem => mem.certificate_url).length,
+        latest_membership: facultyMemberships.length > 0 ?
+          facultyMemberships.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at : null
       };
-    }).sort((a, b) => b.project_count - a.project_count);
+    }).sort((a, b) => b.membership_count - a.membership_count);
 
-    // Sanction Letter Stats
-    const sanctionStats = {
-      with_sanction: filteredProjects.filter(proj => proj.sanction_letter_url).length,
-      without_sanction: filteredProjects.filter(proj => !proj.sanction_letter_url).length,
-      total: filteredProjects.length
+    // Certificate Stats
+    const certificateStats = {
+      with_certificate: filteredMemberships.filter(mem => mem.certificate_url).length,
+      without_certificate: filteredMemberships.filter(mem => !mem.certificate_url).length,
+      total: filteredMemberships.length
     };
 
     // Yearly Trends
-    const yearlyProjects = filteredProjects.reduce((acc, proj) => {
-      const year = new Date(proj.created_at).getFullYear();
+    const yearlyMemberships = filteredMemberships.reduce((acc, mem) => {
+      const year = new Date(mem.created_at).getFullYear();
       acc[year] = (acc[year] || 0) + 1;
       return acc;
     }, {} as Record<number, number>);
 
-    const yearlyData = Object.entries(yearlyProjects)
+    const yearlyData = Object.entries(yearlyMemberships)
       .sort(([a], [b]) => parseInt(a) - parseInt(b))
       .map(([year, count]) => ({
         year: parseInt(year),
-        projects: count
+        memberships: count
       }));
 
-    // Total Funding
-    const totalFunding = filteredProjects.reduce((sum, proj) => sum + (proj.funded_amount || 0), 0);
-
     return {
-      departmentData: projectsByDepartment,
-      designationData: projectsByDesignation,
+      departmentData: membershipsByDepartment,
+      designationData: membershipsByDesignation,
       trendData,
-      agencyData,
+      bodyData,
       facultyPerformance,
-      sanctionStats,
+      certificateStats,
       yearlyData,
-      totalProjects: filteredProjects.length,
+      totalMemberships: filteredMemberships.length,
       totalFaculty: filteredFaculties.length,
-      avgProjectsPerFaculty: filteredFaculties.length > 0 ? (filteredProjects.length / filteredFaculties.length).toFixed(1) : '0',
+      avgMembershipsPerFaculty: filteredFaculties.length > 0 ? (filteredMemberships.length / filteredFaculties.length).toFixed(1) : '0',
       activeFaculty: filteredFaculties.filter(f =>
-        projects.some(proj => proj.user_id === f.id)
-      ).length,
-      totalFunding
+        memberships.some(mem => mem.user_id === f.id)
+      ).length
     };
   };
 
@@ -205,7 +195,7 @@ const ReportsGeneration = () => {
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Projects Report Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-800">Faculty Memberships Dashboard</h1>
         {departments.length > 0 && (
           <select
             value={selectedDepartment}
@@ -224,11 +214,11 @@ const ReportsGeneration = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Memberships</CardTitle>
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalProjects}</div>
+            <div className="text-2xl font-bold">{analytics.totalMemberships}</div>
             <p className="text-xs text-muted-foreground">Across all faculties</p>
           </CardContent>
         </Card>
@@ -240,40 +230,45 @@ const ReportsGeneration = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.totalFaculty}</div>
-            <p className="text-xs text-muted-foreground">{analytics.activeFaculty} with projects</p>
+            <p className="text-xs text-muted-foreground">{analytics.activeFaculty} with memberships</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Projects/Faculty</CardTitle>
+            <CardTitle className="text-sm font-medium">Avg Memberships/Faculty</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.avgProjectsPerFaculty}</div>
+            <div className="text-2xl font-bold">{analytics.avgMembershipsPerFaculty}</div>
             <p className="text-xs text-muted-foreground">Performance metric</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Funding</CardTitle>
+            <CardTitle className="text-sm font-medium">Certificate Rate</CardTitle>
             <Award className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{analytics.totalFunding.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Sum of all projects</p>
+            <div className="text-2xl font-bold">
+              {analytics.totalMemberships > 0 ?
+                ((analytics.certificateStats.with_certificate / analytics.totalMemberships) * 100).toFixed(0) : '0'}%
+            </div>
+            <p className="text-xs text-muted-foreground">
+              {analytics.certificateStats.with_certificate}/{analytics.totalMemberships} with certificates
+            </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Projects by Department */}
+        {/* Memberships by Department */}
         {analytics.departmentData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Projects by Department</CardTitle>
+              <CardTitle>Memberships by Department</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -283,7 +278,7 @@ const ReportsGeneration = () => {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="projects" fill="#8884d8" name="Projects" />
+                  <Bar dataKey="memberships" fill="#8884d8" name="Memberships" />
                   <Bar dataKey="faculty_count" fill="#82ca9d" name="Faculty Count" />
                 </BarChart>
               </ResponsiveContainer>
@@ -291,11 +286,11 @@ const ReportsGeneration = () => {
           </Card>
         )}
 
-        {/* Projects by Designation */}
+        {/* Memberships by Designation */}
         {analytics.designationData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Projects by Designation</CardTitle>
+              <CardTitle>Memberships by Designation</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -305,10 +300,10 @@ const ReportsGeneration = () => {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ designation, projects }) => `${designation}: ${projects}`}
+                    label={({ designation, memberships }) => `${designation}: ${memberships}`}
                     outerRadius={80}
                     fill="#8884d8"
-                    dataKey="projects"
+                    dataKey="memberships"
                   >
                     {analytics.designationData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -325,7 +320,7 @@ const ReportsGeneration = () => {
         {analytics.trendData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Project Trends (Monthly)</CardTitle>
+              <CardTitle>Membership Trends (Monthly)</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -334,25 +329,25 @@ const ReportsGeneration = () => {
                   <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip />
-                  <Area type="monotone" dataKey="projects" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+                  <Area type="monotone" dataKey="memberships" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
         )}
 
-        {/* By Funding Agency */}
-        {analytics.agencyData.length > 0 && (
+        {/* By Professional Body */}
+        {analytics.bodyData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Projects by Funding Agency</CardTitle>
+              <CardTitle>Memberships by Professional Body</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={analytics.agencyData.slice(0, 10)} layout="horizontal">
+                <BarChart data={analytics.bodyData.slice(0, 10)} layout="horizontal">
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
-                  <YAxis dataKey="agency" type="category" width={100} />
+                  <YAxis dataKey="body" type="category" width={100} />
                   <Tooltip />
                   <Bar dataKey="count" fill="#ffc658" />
                 </BarChart>
@@ -362,11 +357,11 @@ const ReportsGeneration = () => {
         )}
       </div>
 
-      {/* Yearly Projects Trend */}
+      {/* Yearly Memberships Trend */}
       {analytics.yearlyData.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Yearly Project Trends</CardTitle>
+            <CardTitle>Yearly Membership Trends</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -375,7 +370,7 @@ const ReportsGeneration = () => {
                 <XAxis dataKey="year" />
                 <YAxis />
                 <Tooltip />
-                <Area type="monotone" dataKey="projects" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
+                <Area type="monotone" dataKey="memberships" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
@@ -386,7 +381,7 @@ const ReportsGeneration = () => {
       {analytics.facultyPerformance.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Faculty Project Overview</CardTitle>
+            <CardTitle>Faculty Membership Overview</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -397,11 +392,10 @@ const ReportsGeneration = () => {
                     <th className="text-left p-2">Name</th>
                     <th className="text-left p-2">Department</th>
                     <th className="text-left p-2">Designation</th>
-                    <th className="text-right p-2">Total Projects</th>
-                    <th className="text-right p-2">Recent Projects</th>
-                    <th className="text-right p-2">Total Funding</th>
-                    <th className="text-right p-2">With Sanction</th>
-                    <th className="text-left p-2">Latest Project</th>
+                    <th className="text-right p-2">Total Memberships</th>
+                    <th className="text-right p-2">Recent Memberships</th>
+                    <th className="text-right p-2">With Certificates</th>
+                    <th className="text-left p-2">Latest Membership</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -411,12 +405,11 @@ const ReportsGeneration = () => {
                       <td className="p-2 font-medium">{faculty.full_name || faculty.email}</td>
                       <td className="p-2">{faculty.department || 'N/A'}</td>
                       <td className="p-2">{faculty.designation || 'N/A'}</td>
-                      <td className="p-2 text-right font-semibold text-blue-600">{faculty.project_count}</td>
-                      <td className="p-2 text-right">{faculty.recent_projects}</td>
-                      <td className="p-2 text-right">₹{faculty.total_funds.toLocaleString()}</td>
-                      <td className="p-2 text-right">{faculty.has_sanction}</td>
+                      <td className="p-2 text-right font-semibold text-blue-600">{faculty.membership_count}</td>
+                      <td className="p-2 text-right">{faculty.recent_memberships}</td>
+                      <td className="p-2 text-right">{faculty.has_certificate}</td>
                       <td className="p-2 text-sm text-gray-600">
-                        {faculty.latest_project ? new Date(faculty.latest_project).toLocaleDateString() : 'N/A'}
+                        {faculty.latest_membership ? new Date(faculty.latest_membership).toLocaleDateString() : 'N/A'}
                       </td>
                     </tr>
                   ))}
@@ -428,12 +421,12 @@ const ReportsGeneration = () => {
       )}
 
       {/* No Data Message */}
-      {analytics.totalProjects === 0 && (
+      {analytics.totalMemberships === 0 && (
         <Card>
           <CardContent className="text-center py-8">
             <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">No Projects Data Available</h3>
-            <p className="text-gray-500">Add some projects to see detailed analytics.</p>
+            <h3 className="text-lg font-semibold text-gray-600 mb-2">No Membership Data Available</h3>
+            <p className="text-gray-500">Add some memberships to see detailed analytics.</p>
           </CardContent>
         </Card>
       )}
@@ -441,4 +434,4 @@ const ReportsGeneration = () => {
   );
 };
 
-export default ReportsGeneration;
+export default MembershipDashboard;

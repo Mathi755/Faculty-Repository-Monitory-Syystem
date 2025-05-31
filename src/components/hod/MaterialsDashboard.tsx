@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/components/ui/use-toast";
-import { Users, Target, Award } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
 } from "recharts";
+import { BookOpen, Users, Target, FileText } from "lucide-react";
 
 interface FacultyProfile {
   id: string;
@@ -16,21 +15,21 @@ interface FacultyProfile {
   designation?: string | null;
 }
 
-interface Project {
+interface TeachingMaterial {
   id: string;
   user_id: string;
   title: string;
-  funding_agency: string;
-  funded_amount: number;
-  duration_from: string;
-  duration_to: string;
-  sanction_letter_url?: string | null;
+  course_code: string;
+  course_name: string;
+  material_type: string;
+  file_url?: string | null;
+  description?: string | null;
   created_at: string;
 }
 
-const ReportsGeneration = () => {
+const MaterialsDashboard = () => {
   const [faculties, setFaculties] = useState<FacultyProfile[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [materials, setMaterials] = useState<TeachingMaterial[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState('all');
 
@@ -41,12 +40,12 @@ const ReportsGeneration = () => {
         const { data: facultyData } = await supabase
           .from("profiles")
           .select("id, email, full_name, department, designation");
-        const { data: projectData } = await supabase
-          .from("projects")
+        const { data: materialData } = await supabase
+          .from("teaching_materials")
           .select("*")
           .order("created_at", { ascending: false });
         setFaculties(facultyData || []);
-        setProjects(projectData || []);
+        setMaterials(materialData || []);
       } finally {
         setLoading(false);
       }
@@ -62,42 +61,42 @@ const ReportsGeneration = () => {
       ? faculties
       : faculties.filter(f => f.department === selectedDepartment);
 
-    const filteredProjects = projects.filter(proj =>
-      filteredFaculties.some(f => f.id === proj.user_id)
+    const filteredMaterials = materials.filter(mat =>
+      filteredFaculties.some(f => f.id === mat.user_id)
     );
 
     // By Department
     const departments = [...new Set(faculties.map(f => f.department).filter(Boolean))];
-    const projectsByDepartment = departments.map(dept => {
+    const materialsByDepartment = departments.map(dept => {
       const deptFaculties = faculties.filter(f => f.department === dept);
-      const deptProjects = projects.filter(proj =>
-        deptFaculties.some(f => f.id === proj.user_id)
+      const deptMaterials = materials.filter(mat =>
+        deptFaculties.some(f => f.id === mat.user_id)
       );
       return {
         department: dept || 'Unknown',
-        projects: deptProjects.length,
+        materials: deptMaterials.length,
         faculty_count: deptFaculties.length,
-        avg_projects: deptFaculties.length > 0 ? (deptProjects.length / deptFaculties.length).toFixed(1) : 0
+        avg_materials: deptFaculties.length > 0 ? (deptMaterials.length / deptFaculties.length).toFixed(1) : 0
       };
     });
 
     // By Designation
     const designations = [...new Set(faculties.map(f => f.designation).filter(Boolean))];
-    const projectsByDesignation = designations.map(designation => {
+    const materialsByDesignation = designations.map(designation => {
       const desigFaculties = faculties.filter(f => f.designation === designation);
-      const desigProjects = projects.filter(proj =>
-        desigFaculties.some(f => f.id === proj.user_id)
+      const desigMaterials = materials.filter(mat =>
+        desigFaculties.some(f => f.id === mat.user_id)
       );
       return {
         designation: designation || 'Unknown',
-        projects: desigProjects.length,
+        materials: desigMaterials.length,
         faculty_count: desigFaculties.length
       };
     });
 
     // Monthly Trends
-    const monthlyTrends = filteredProjects.reduce((acc, proj) => {
-      const month = proj.created_at.substring(0, 7); // YYYY-MM
+    const monthlyTrends = filteredMaterials.reduce((acc, mat) => {
+      const month = mat.created_at.substring(0, 7); // YYYY-MM
       acc[month] = (acc[month] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -108,76 +107,59 @@ const ReportsGeneration = () => {
       .map(([month, count]) => ({
         month: new Date(month + '-01').toLocaleDateString('en-US', { year: 'numeric', month: 'short' }),
         monthKey: month,
-        projects: count
+        materials: count
       }));
 
-    // By Funding Agency
-    const agencies = [...new Set(filteredProjects.map(proj => proj.funding_agency))];
-    const agencyData = agencies.map(agency => ({
-      agency,
-      count: filteredProjects.filter(proj => proj.funding_agency === agency).length,
-      total_funds: filteredProjects
-        .filter(proj => proj.funding_agency === agency)
-        .reduce((sum, proj) => sum + (proj.funded_amount || 0), 0)
+    // By Material Type
+    const types = [...new Set(filteredMaterials.map(mat => mat.material_type))];
+    const typeData = types.map(type => ({
+      type,
+      count: filteredMaterials.filter(mat => mat.material_type === type).length
     })).sort((a, b) => b.count - a.count);
 
     // Top Performers
     const facultyPerformance = filteredFaculties.map(faculty => {
-      const facultyProjects = projects.filter(proj => proj.user_id === faculty.id);
+      const facultyMaterials = materials.filter(mat => mat.user_id === faculty.id);
       const currentYear = new Date().getFullYear();
-      const recentProjects = facultyProjects.filter(proj =>
-        new Date(proj.created_at).getFullYear() >= currentYear - 1
+      const recentMaterials = facultyMaterials.filter(mat =>
+        new Date(mat.created_at).getFullYear() >= currentYear - 1
       );
       return {
         ...faculty,
-        project_count: facultyProjects.length,
-        recent_projects: recentProjects.length,
-        total_funds: facultyProjects.reduce((sum, proj) => sum + (proj.funded_amount || 0), 0),
-        has_sanction: facultyProjects.filter(proj => proj.sanction_letter_url).length,
-        latest_project: facultyProjects.length > 0 ?
-          facultyProjects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at : null
+        material_count: facultyMaterials.length,
+        recent_materials: recentMaterials.length,
+        latest_material: facultyMaterials.length > 0 ?
+          facultyMaterials.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0].created_at : null
       };
-    }).sort((a, b) => b.project_count - a.project_count);
-
-    // Sanction Letter Stats
-    const sanctionStats = {
-      with_sanction: filteredProjects.filter(proj => proj.sanction_letter_url).length,
-      without_sanction: filteredProjects.filter(proj => !proj.sanction_letter_url).length,
-      total: filteredProjects.length
-    };
+    }).sort((a, b) => b.material_count - a.material_count);
 
     // Yearly Trends
-    const yearlyProjects = filteredProjects.reduce((acc, proj) => {
-      const year = new Date(proj.created_at).getFullYear();
+    const yearlyMaterials = filteredMaterials.reduce((acc, mat) => {
+      const year = new Date(mat.created_at).getFullYear();
       acc[year] = (acc[year] || 0) + 1;
       return acc;
     }, {} as Record<number, number>);
 
-    const yearlyData = Object.entries(yearlyProjects)
+    const yearlyData = Object.entries(yearlyMaterials)
       .sort(([a], [b]) => parseInt(a) - parseInt(b))
       .map(([year, count]) => ({
         year: parseInt(year),
-        projects: count
+        materials: count
       }));
 
-    // Total Funding
-    const totalFunding = filteredProjects.reduce((sum, proj) => sum + (proj.funded_amount || 0), 0);
-
     return {
-      departmentData: projectsByDepartment,
-      designationData: projectsByDesignation,
+      departmentData: materialsByDepartment,
+      designationData: materialsByDesignation,
       trendData,
-      agencyData,
+      typeData,
       facultyPerformance,
-      sanctionStats,
       yearlyData,
-      totalProjects: filteredProjects.length,
+      totalMaterials: filteredMaterials.length,
       totalFaculty: filteredFaculties.length,
-      avgProjectsPerFaculty: filteredFaculties.length > 0 ? (filteredProjects.length / filteredFaculties.length).toFixed(1) : '0',
+      avgMaterialsPerFaculty: filteredFaculties.length > 0 ? (filteredMaterials.length / filteredFaculties.length).toFixed(1) : '0',
       activeFaculty: filteredFaculties.filter(f =>
-        projects.some(proj => proj.user_id === f.id)
-      ).length,
-      totalFunding
+        materials.some(mat => mat.user_id === f.id)
+      ).length
     };
   };
 
@@ -205,7 +187,7 @@ const ReportsGeneration = () => {
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold text-gray-800">Projects Report Dashboard</h1>
+        <h1 className="text-3xl font-bold text-gray-800">Teaching Materials Dashboard</h1>
         {departments.length > 0 && (
           <select
             value={selectedDepartment}
@@ -224,11 +206,11 @@ const ReportsGeneration = () => {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Materials</CardTitle>
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.totalProjects}</div>
+            <div className="text-2xl font-bold">{analytics.totalMaterials}</div>
             <p className="text-xs text-muted-foreground">Across all faculties</p>
           </CardContent>
         </Card>
@@ -240,40 +222,40 @@ const ReportsGeneration = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{analytics.totalFaculty}</div>
-            <p className="text-xs text-muted-foreground">{analytics.activeFaculty} with projects</p>
+            <p className="text-xs text-muted-foreground">{analytics.activeFaculty} with materials</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Projects/Faculty</CardTitle>
+            <CardTitle className="text-sm font-medium">Avg Materials/Faculty</CardTitle>
             <Target className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{analytics.avgProjectsPerFaculty}</div>
+            <div className="text-2xl font-bold">{analytics.avgMaterialsPerFaculty}</div>
             <p className="text-xs text-muted-foreground">Performance metric</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Funding</CardTitle>
-            <Award className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Material Types</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">₹{analytics.totalFunding.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">Sum of all projects</p>
+            <div className="text-2xl font-bold">{analytics.typeData.length}</div>
+            <p className="text-xs text-muted-foreground">Unique types uploaded</p>
           </CardContent>
         </Card>
       </div>
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Projects by Department */}
+        {/* Materials by Department */}
         {analytics.departmentData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Projects by Department</CardTitle>
+              <CardTitle>Materials by Department</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -283,7 +265,7 @@ const ReportsGeneration = () => {
                   <YAxis />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="projects" fill="#8884d8" name="Projects" />
+                  <Bar dataKey="materials" fill="#8884d8" name="Materials" />
                   <Bar dataKey="faculty_count" fill="#82ca9d" name="Faculty Count" />
                 </BarChart>
               </ResponsiveContainer>
@@ -291,11 +273,11 @@ const ReportsGeneration = () => {
           </Card>
         )}
 
-        {/* Projects by Designation */}
+        {/* Materials by Designation */}
         {analytics.designationData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Projects by Designation</CardTitle>
+              <CardTitle>Materials by Designation</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -305,10 +287,10 @@ const ReportsGeneration = () => {
                     cx="50%"
                     cy="50%"
                     labelLine={false}
-                    label={({ designation, projects }) => `${designation}: ${projects}`}
+                    label={({ designation, materials }) => `${designation}: ${materials}`}
                     outerRadius={80}
                     fill="#8884d8"
-                    dataKey="projects"
+                    dataKey="materials"
                   >
                     {analytics.designationData.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -325,7 +307,7 @@ const ReportsGeneration = () => {
         {analytics.trendData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Project Trends (Monthly)</CardTitle>
+              <CardTitle>Material Upload Trends (Monthly)</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
@@ -334,25 +316,25 @@ const ReportsGeneration = () => {
                   <XAxis dataKey="month" />
                   <YAxis />
                   <Tooltip />
-                  <Area type="monotone" dataKey="projects" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+                  <Area type="monotone" dataKey="materials" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
                 </AreaChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
         )}
 
-        {/* By Funding Agency */}
-        {analytics.agencyData.length > 0 && (
+        {/* By Material Type */}
+        {analytics.typeData.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle>Projects by Funding Agency</CardTitle>
+              <CardTitle>Materials by Type</CardTitle>
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={analytics.agencyData.slice(0, 10)} layout="horizontal">
+                <BarChart data={analytics.typeData.slice(0, 10)} layout="horizontal">
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
-                  <YAxis dataKey="agency" type="category" width={100} />
+                  <YAxis dataKey="type" type="category" width={100} />
                   <Tooltip />
                   <Bar dataKey="count" fill="#ffc658" />
                 </BarChart>
@@ -362,11 +344,11 @@ const ReportsGeneration = () => {
         )}
       </div>
 
-      {/* Yearly Projects Trend */}
+      {/* Yearly Materials Trend */}
       {analytics.yearlyData.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Yearly Project Trends</CardTitle>
+            <CardTitle>Yearly Material Upload Trends</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -375,7 +357,7 @@ const ReportsGeneration = () => {
                 <XAxis dataKey="year" />
                 <YAxis />
                 <Tooltip />
-                <Area type="monotone" dataKey="projects" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
+                <Area type="monotone" dataKey="materials" stroke="#82ca9d" fill="#82ca9d" fillOpacity={0.3} />
               </AreaChart>
             </ResponsiveContainer>
           </CardContent>
@@ -386,7 +368,7 @@ const ReportsGeneration = () => {
       {analytics.facultyPerformance.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Faculty Project Overview</CardTitle>
+            <CardTitle>Faculty Material Contribution Overview</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -397,11 +379,9 @@ const ReportsGeneration = () => {
                     <th className="text-left p-2">Name</th>
                     <th className="text-left p-2">Department</th>
                     <th className="text-left p-2">Designation</th>
-                    <th className="text-right p-2">Total Projects</th>
-                    <th className="text-right p-2">Recent Projects</th>
-                    <th className="text-right p-2">Total Funding</th>
-                    <th className="text-right p-2">With Sanction</th>
-                    <th className="text-left p-2">Latest Project</th>
+                    <th className="text-right p-2">Total Materials</th>
+                    <th className="text-right p-2">Recent Materials</th>
+                    <th className="text-left p-2">Latest Upload</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -411,12 +391,10 @@ const ReportsGeneration = () => {
                       <td className="p-2 font-medium">{faculty.full_name || faculty.email}</td>
                       <td className="p-2">{faculty.department || 'N/A'}</td>
                       <td className="p-2">{faculty.designation || 'N/A'}</td>
-                      <td className="p-2 text-right font-semibold text-blue-600">{faculty.project_count}</td>
-                      <td className="p-2 text-right">{faculty.recent_projects}</td>
-                      <td className="p-2 text-right">₹{faculty.total_funds.toLocaleString()}</td>
-                      <td className="p-2 text-right">{faculty.has_sanction}</td>
+                      <td className="p-2 text-right font-semibold text-blue-600">{faculty.material_count}</td>
+                      <td className="p-2 text-right">{faculty.recent_materials}</td>
                       <td className="p-2 text-sm text-gray-600">
-                        {faculty.latest_project ? new Date(faculty.latest_project).toLocaleDateString() : 'N/A'}
+                        {faculty.latest_material ? new Date(faculty.latest_material).toLocaleDateString() : 'N/A'}
                       </td>
                     </tr>
                   ))}
@@ -428,12 +406,12 @@ const ReportsGeneration = () => {
       )}
 
       {/* No Data Message */}
-      {analytics.totalProjects === 0 && (
+      {analytics.totalMaterials === 0 && (
         <Card>
           <CardContent className="text-center py-8">
-            <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-600 mb-2">No Projects Data Available</h3>
-            <p className="text-gray-500">Add some projects to see detailed analytics.</p>
+            <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-600 mb-2">No Teaching Materials Data Available</h3>
+            <p className="text-gray-500">Add some teaching materials to see detailed analytics.</p>
           </CardContent>
         </Card>
       )}
@@ -441,4 +419,4 @@ const ReportsGeneration = () => {
   );
 };
 
-export default ReportsGeneration;
+export default MaterialsDashboard;
