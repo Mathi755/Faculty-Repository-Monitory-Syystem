@@ -3,6 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import Particles from "react-tsparticles";
+import { loadFull } from "tsparticles";
 import { 
   GraduationCap, 
   FileText, 
@@ -10,7 +12,6 @@ import {
   Award, 
   Calendar, 
   Users, 
-  Upload, 
   LogOut,
   BookOpen,
   UserCheck,
@@ -87,7 +88,6 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error);
         if (error.code === 'PGRST116') {
           const { error: insertError } = await supabase
             .from('profiles')
@@ -110,7 +110,7 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
         setUserProfile(profile);
       }
     } catch (error) {
-      console.error('Error fetching user profile:', error);
+      // handle error
     }
   };
 
@@ -119,7 +119,6 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch counts for each table - only for current user
       const [
         fdpData,
         publicationsData,
@@ -138,7 +137,7 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
         supabase.from('patents').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('workshops').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('awards').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
-        supabase.from('timetable').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
+        supabase.from('timetables').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('memberships').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('student_projects').select('id', { count: 'exact', head: true }).eq('user_id', user.id),
         supabase.from('teaching_materials').select('id', { count: 'exact', head: true }).eq('user_id', user.id)
@@ -157,7 +156,7 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
         teachingMaterials: teachingMaterialsData.count || 0
       });
     } catch (error) {
-      console.error('Error fetching counts:', error);
+      // handle error
     }
   };
 
@@ -244,22 +243,76 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
     }
   ];
 
+  const particlesInit = async (main: any) => {
+    await loadFull(main);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <motion.header 
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-white shadow-sm border-b"
-      >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
+    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
+      {/* Spider web particles background */}
+      <Particles
+        id="tsparticles"
+        init={particlesInit}
+        options={{
+          fullScreen: { enable: false },
+          background: { color: { value: "#f8fafc" } },
+          fpsLimit: 60,
+          interactivity: {
+            events: {
+              onHover: { enable: true, mode: "repulse" },
+              resize: true,
+            },
+            modes: {
+              repulse: { distance: 80, duration: 0.4 },
+            },
+          },
+          particles: {
+            color: { value: "#60a5fa" },
+            links: {
+              color: "#60a5fa",
+              distance: 120,
+              enable: true,
+              opacity: 0.25,
+              width: 1,
+            },
+            collisions: { enable: false },
+            move: {
+              direction: "none",
+              enable: true,
+              outModes: { default: "bounce" },
+              random: false,
+              speed: 0.6,
+              straight: false,
+            },
+            number: { density: { enable: true, area: 900 }, value: 60 },
+            opacity: { value: 0.5 },
+            shape: { type: "circle" },
+            size: { value: { min: 1, max: 3 } },
+          },
+          detectRetina: true,
+        }}
+        style={{
+          position: "absolute",
+          zIndex: 0,
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+        }}
+      />
+
+      {/* Main Content */}
+      <div className="relative z-10 flex flex-col min-h-screen">
+        {/* Header */}
+        <header className="bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <GraduationCap className="h-8 w-8 text-indigo-600" />
+              <GraduationCap className="h-8 w-8 text-blue-600" />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">Faculty Portal</h1>
-                <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <h1 className="text-3xl md:text-4xl font-black text-blue-900 tracking-tight">
+                  Faculty Portal
+                </h1>
+                <div className="flex items-center space-x-2 text-sm text-slate-600">
                   <User className="h-4 w-4" />
                   <span>{userProfile?.full_name}</span>
                   {userProfile?.department && (
@@ -279,46 +332,34 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
               </Button>
             </div>
           </div>
-        </div>
-      </motion.header>
+        </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-6 lg:grid-cols-11 w-full">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="fdp">FDP</TabsTrigger>
-            <TabsTrigger value="publications">Publications</TabsTrigger>
-            <TabsTrigger value="projects">Projects</TabsTrigger>
-            <TabsTrigger value="patents">Patents</TabsTrigger>
-            <TabsTrigger value="workshops">Workshops</TabsTrigger>
-            <TabsTrigger value="awards">Awards</TabsTrigger>
-            <TabsTrigger value="timetable">Timetable</TabsTrigger>
-            <TabsTrigger value="membership">Membership</TabsTrigger>
-            <TabsTrigger value="student-projects">Students</TabsTrigger>
-            <TabsTrigger value="teaching-materials">Materials</TabsTrigger>
-          </TabsList>
+        <main className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <TabsList className="grid grid-cols-6 lg:grid-cols-11 w-full bg-white rounded-xl shadow">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+              <TabsTrigger value="fdp">FDP</TabsTrigger>
+              <TabsTrigger value="publications">Publications</TabsTrigger>
+              <TabsTrigger value="projects">Projects</TabsTrigger>
+              <TabsTrigger value="patents">Patents</TabsTrigger>
+              <TabsTrigger value="workshops">Workshops</TabsTrigger>
+              <TabsTrigger value="awards">Awards</TabsTrigger>
+              <TabsTrigger value="timetable">Timetable</TabsTrigger>
+              <TabsTrigger value="membership">Membership</TabsTrigger>
+              <TabsTrigger value="student-projects">Students</TabsTrigger>
+              <TabsTrigger value="teaching-materials">Materials</TabsTrigger>
+            </TabsList>
 
-          <TabsContent value="overview" className="space-y-6">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-            >
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Welcome, {userProfile?.full_name}</h2>
-              <p className="text-gray-600">Manage your academic and research activities</p>
-            </motion.div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {modules.map((module, index) => (
-                <motion.div
-                  key={module.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: index * 0.1 }}
-                >
-                  <Card 
-                    className="hover:shadow-lg transition-shadow cursor-pointer group"
+            <TabsContent value="overview" className="space-y-6">
+              <h2 className="text-2xl md:text-3xl font-bold text-blue-900 mb-2">
+                Welcome, {userProfile?.full_name}
+              </h2>
+              <p className="text-slate-600">Manage your academic and research activities</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {modules.map((module, index) => (
+                  <Card
+                    key={module.id}
+                    className="hover:shadow-2xl transition-shadow cursor-pointer group bg-white rounded-2xl"
                     onClick={() => setActiveTab(module.id)}
                   >
                     <CardHeader className="pb-3">
@@ -334,52 +375,43 @@ const FacultyDashboard = ({ onLogout }: FacultyDashboardProps) => {
                       <CardDescription>{module.description}</CardDescription>
                     </CardContent>
                   </Card>
-                </motion.div>
-              ))}
-            </div>
-          </TabsContent>
+                ))}
+              </div>
+            </TabsContent>
 
-          <TabsContent value="fdp">
-            <FDPForm />
-          </TabsContent>
-
-          <TabsContent value="publications">
-            <PublicationForm />
-          </TabsContent>
-
-          <TabsContent value="projects">
-            <ProjectForm />
-          </TabsContent>
-
-          <TabsContent value="patents">
-            <PatentForm />
-          </TabsContent>
-
-          <TabsContent value="workshops">
-            <WorkshopForm />
-          </TabsContent>
-
-          <TabsContent value="awards">
-            <AwardsForm />
-          </TabsContent>
-
-          <TabsContent value="timetable">
-            <TimetableForm />
-          </TabsContent>
-
-          <TabsContent value="membership">
-            <MembershipForm />
-          </TabsContent>
-
-          <TabsContent value="student-projects">
-            <StudentProjectForm />
-          </TabsContent>
-
-          <TabsContent value="teaching-materials">
-            <TeachingMaterialForm />
-          </TabsContent>
-        </Tabs>
-      </main>
+            <TabsContent value="fdp">
+              <FDPForm />
+            </TabsContent>
+            <TabsContent value="publications">
+              <PublicationForm />
+            </TabsContent>
+            <TabsContent value="projects">
+              <ProjectForm />
+            </TabsContent>
+            <TabsContent value="patents">
+              <PatentForm />
+            </TabsContent>
+            <TabsContent value="workshops">
+              <WorkshopForm />
+            </TabsContent>
+            <TabsContent value="awards">
+              <AwardsForm />
+            </TabsContent>
+            <TabsContent value="timetable">
+              <TimetableForm />
+            </TabsContent>
+            <TabsContent value="membership">
+              <MembershipForm />
+            </TabsContent>
+            <TabsContent value="student-projects">
+              <StudentProjectForm />
+            </TabsContent>
+            <TabsContent value="teaching-materials">
+              <TeachingMaterialForm />
+            </TabsContent>
+          </Tabs>
+        </main>
+      </div>
     </div>
   );
 };

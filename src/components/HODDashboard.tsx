@@ -32,6 +32,9 @@ import MembershipDashboard from "@/components/hod/MembershipDashboard";
 import TimetableDashboard from "@/components/hod/TimetableDashboard";
 import StudentsDashboard from "@/components/hod/StudentsDashboard";
 import MaterialsDashboard from "@/components/hod/MaterialsDashboard";
+import { motion } from "framer-motion";
+import Particles from "react-tsparticles";
+import { loadFull } from "tsparticles";
 
 interface HODDashboardProps {
   onLogout: () => void;
@@ -376,19 +379,85 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
     fetchStats();
   }, []);
 
+  const particlesInit = async (main: any) => {
+    await loadFull(main);
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 relative overflow-hidden">
+      {/* Spider web particles background */}
+      <Particles
+        id="tsparticles"
+        init={particlesInit}
+        options={{
+          fullScreen: { enable: false },
+          background: { color: { value: "#f8fafc" } },
+          fpsLimit: 60,
+          interactivity: {
+            events: {
+              onHover: { enable: true, mode: "repulse" },
+              resize: true,
+            },
+            modes: {
+              repulse: { distance: 80, duration: 0.4 },
+            },
+          },
+          particles: {
+            color: { value: "#60a5fa" },
+            links: {
+              color: "#60a5fa",
+              distance: 120,
+              enable: true,
+              opacity: 0.25,
+              width: 1,
+            },
+            collisions: { enable: false },
+            move: {
+              direction: "none",
+              enable: true,
+              outModes: { default: "bounce" },
+              random: false,
+              speed: 0.6,
+              straight: false,
+            },
+            number: { density: { enable: true, area: 900 }, value: 60 },
+            opacity: { value: 0.5 },
+            shape: { type: "circle" },
+            size: { value: { min: 1, max: 3 } },
+          },
+          detectRetina: true,
+        }}
+        style={{
+          position: "absolute",
+          zIndex: 0,
+          top: 0,
+          left: 0,
+          width: "100%",
+          height: "100%",
+        }}
+      />
+
       {/* Header */}
-      <header className="bg-white shadow-sm border-b">
+      <motion.header 
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="relative z-10 bg-white shadow-sm border-b"
+      >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <GraduationCap className="h-8 w-8 text-indigo-600" />
+              <GraduationCap className="h-8 w-8 text-blue-600" />
               <div>
-                <h1 className="text-xl font-bold text-gray-900">HOD Portal</h1>
-                <p className="text-sm text-gray-600">
-                  {currentUser?.full_name || "Loading..."} - {currentUser?.department ? `Department of ${currentUser.department}` : "Department"}
-                </p>
+                <h1 className="text-3xl md:text-4xl font-black text-blue-900 tracking-tight">
+                  HOD Portal
+                </h1>
+                <div className="flex items-center space-x-2 text-sm text-slate-600">
+                  <span>{currentUser?.full_name || "Loading..."}</span>
+                  {currentUser?.department && (
+                    <span>- Department of {currentUser.department}</span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -400,12 +469,12 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
             </div>
           </div>
         </div>
-      </header>
+      </motion.header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-11 w-full max-w-5xl">
+          <TabsList className="grid grid-cols-6 lg:grid-cols-11 w-full bg-white rounded-xl shadow">
             <TabsTrigger value="dashboard">Overview</TabsTrigger>
             <TabsTrigger value="fdp">FDP</TabsTrigger>
             <TabsTrigger value="publications">Publications</TabsTrigger>
@@ -420,37 +489,50 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Department Overview</h2>
-              <p className="text-gray-600">Monitor and analyze faculty performance and departmental metrics</p>
-            </div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+            >
+              <h2 className="text-2xl md:text-3xl font-bold text-blue-900 mb-2">
+                Department Overview
+              </h2>
+              <p className="text-slate-600">Monitor and analyze faculty performance and departmental metrics</p>
+            </motion.div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {stats.map((stat, index) => (
-                <Card key={index}>
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-gray-600">
-                      {stat.title}
-                    </CardTitle>
-                    <stat.icon className={`h-4 w-4 ${stat.color}`} />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                    <p className="text-xs text-green-600 mt-1">
-                      {stat.change} from last year
-                    </p>
-                  </CardContent>
-                </Card>
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                >
+                  <Card className="bg-white rounded-2xl shadow-xl">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                      <CardTitle className="text-sm font-medium text-slate-600">
+                        {stat.title}
+                      </CardTitle>
+                      <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stat.value}</div>
+                      <p className="text-xs text-green-600 mt-1">
+                        {stat.change} from last year
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
               ))}
             </div>
 
             {/* Quick Actions */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveTab("faculty-data")}>
+              <Card className="hover:shadow-2xl transition-shadow cursor-pointer group bg-white rounded-2xl" onClick={() => setActiveTab("faculty-data")}>
                 <CardHeader>
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-100 rounded-lg">
+                    <div className="p-2 bg-blue-100 rounded-lg group-hover:scale-110 transition-transform">
                       <Users className="h-5 w-5 text-blue-600" />
                     </div>
                     <div>
@@ -461,10 +543,10 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
                 </CardHeader>
               </Card>
 
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveTab("reports")}>
+              <Card className="hover:shadow-2xl transition-shadow cursor-pointer group bg-white rounded-2xl" onClick={() => setActiveTab("reports")}>
                 <CardHeader>
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-green-100 rounded-lg">
+                    <div className="p-2 bg-green-100 rounded-lg group-hover:scale-110 transition-transform">
                       <FileText className="h-5 w-5 text-green-600" />
                     </div>
                     <div>
@@ -475,10 +557,10 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
                 </CardHeader>
               </Card>
 
-              <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => setActiveTab("analytics")}>
+              <Card className="hover:shadow-2xl transition-shadow cursor-pointer group bg-white rounded-2xl" onClick={() => setActiveTab("analytics")}>
                 <CardHeader>
                   <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-purple-100 rounded-lg">
+                    <div className="p-2 bg-purple-100 rounded-lg group-hover:scale-110 transition-transform">
                       <BarChart3 className="h-5 w-5 text-purple-600" />
                     </div>
                     <div>
@@ -491,7 +573,7 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
             </div>
 
             {/* Recent Activity */}
-            <Card>
+            <Card className="bg-white rounded-2xl shadow-xl">
               <CardHeader>
                 <CardTitle>Recent Faculty Activity</CardTitle>
                 <CardDescription>Latest submissions and updates across all categories</CardDescription>
@@ -499,26 +581,26 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
               <CardContent>
                 <div className="space-y-4">
                   {recentActivities.length === 0 && (
-                    <div className="text-gray-500 text-center py-8">No recent activity</div>
+                    <div className="text-slate-500 text-center py-8">No recent activity</div>
                   )}
                   {recentActivities.map((activity, idx) => {
                     const IconComponent = getActivityIcon(activity.type);
                     const colorClass = getActivityColor(activity.type);
                     
                     return (
-                      <div key={activity.type + activity.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div key={activity.type + activity.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
                         <div className="flex items-center space-x-3">
                           <div className={`p-2 rounded-full ${colorClass}`}>
                             <IconComponent className="h-4 w-4" />
                           </div>
                           <div>
                             <p className="font-medium">{activity.faculty}</p>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm text-slate-600">
                               Added {activity.type.toLowerCase()}: {activity.title}
                             </p>
                           </div>
                         </div>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-slate-500">
                           {new Date(activity.created_at).toLocaleString()}
                         </span>
                       </div>
@@ -532,7 +614,6 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
           <TabsContent value="fdp">
             <FacultyDataView />
           </TabsContent>
-
           <TabsContent value="publications">
             <PublicationsDashboard />
           </TabsContent>
@@ -560,14 +641,6 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
           <TabsContent value="materials">
             <MaterialsDashboard />
           </TabsContent>
-
-          {/* 
-            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="faculty-data">FDP</TabsTrigger>
-            <TabsTrigger value="reports">Projects</TabsTrigger>
-            <TabsTrigger value="analytics">Patents</TabsTrigger>
-            <TabsTrigger value="awards">Awards</TabsTrigger>
-          */}
         </Tabs>
       </main>
     </div>
