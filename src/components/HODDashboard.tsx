@@ -398,11 +398,13 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-4 w-full max-w-md">
+          <TabsList className="grid grid-cols-6 w-full max-w-md">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-            <TabsTrigger value="faculty-data">FDP</TabsTrigger>
-            <TabsTrigger value="reports">Reports</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="fdp">FDP</TabsTrigger>
+            <TabsTrigger value="projects">Projects</TabsTrigger>
+            <TabsTrigger value="patents">Patents</TabsTrigger>
+            <TabsTrigger value="awards">Awards</TabsTrigger>
+            <TabsTrigger value="publications">Publications</TabsTrigger>
           </TabsList>
 
           <TabsContent value="dashboard" className="space-y-6">
@@ -515,17 +517,33 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="faculty-data">
+          <TabsContent value="fdp">
             <FacultyDataView />
           </TabsContent>
 
-          <TabsContent value="reports">
+          <TabsContent value="projects">
             <ReportsGeneration />
           </TabsContent>
 
-          <TabsContent value="analytics">
+          <TabsContent value="Patents">
             <AnalyticsDashboard />
           </TabsContent>
+
+          <TabsContent value="publications">
+            <AnalyticsDashboard />
+          </TabsContent>
+
+          <TabsContent value="awards">
+            <AnalyticsDashboard />
+          </TabsContent>
+
+          {/* 
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="faculty-data">FDP</TabsTrigger>
+            <TabsTrigger value="reports">Projects</TabsTrigger>
+            <TabsTrigger value="analytics">Patents</TabsTrigger>
+            <TabsTrigger value="awards">Awards</TabsTrigger>
+          */}
         </Tabs>
       </main>
     </div>
