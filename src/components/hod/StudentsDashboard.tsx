@@ -5,7 +5,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, AreaChart, Area
 } from "recharts";
-import { Users, Target, BookOpen } from "lucide-react";
+import { Users, Target, BookOpen, Search } from "lucide-react";
 
 interface FacultyProfile {
   id: string;
@@ -33,6 +33,9 @@ const StudentsDashboard = () => {
   const [projects, setProjects] = useState<StudentProject[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDepartment, setSelectedDepartment] = useState('all');
+  const [showModal, setShowModal] = useState(false);
+  const [selectedFaculty, setSelectedFaculty] = useState<FacultyProfile | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,7 +49,12 @@ const StudentsDashboard = () => {
           .select("*")
           .order("created_at", { ascending: false });
         setFaculties(facultyData || []);
-        setProjects(projectData || []);
+        setProjects(
+          (projectData || []).map((proj: any) => ({
+            status: proj.status ?? "Unknown",
+            ...proj
+          }))
+        );
       } finally {
         setLoading(false);
       }
@@ -167,6 +175,75 @@ const StudentsDashboard = () => {
   const analytics = getAnalytics();
   const COLORS = ['#8884d8', '#82ca9d', '#ffc658', '#ff7c7c', '#8dd1e1', '#d084d0', '#ffb347'];
   const departments = [...new Set(faculties.map(f => f.department).filter(Boolean))];
+
+  // Filter faculty based on search term
+  const filteredFacultyPerformance = analytics?.facultyPerformance?.filter(faculty =>
+    (faculty.full_name || faculty.email || '').toLowerCase().includes(searchTerm.toLowerCase())
+  ) || [];
+
+  // Modal for project details
+  const Modal = () => {
+    if (!selectedFaculty) return null;
+    const facultyProjects = projects.filter(p => p.user_id === selectedFaculty.id);
+
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+          <div className="p-6 border-b border-gray-200 flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">
+                {selectedFaculty.full_name || selectedFaculty.email}
+              </h2>
+              <p className="text-gray-600">{selectedFaculty.designation || 'Faculty'}</p>
+            </div>
+            <button
+              className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+              onClick={() => setShowModal(false)}
+              aria-label="Close"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <div className="p-6 max-h-96 overflow-y-auto">
+            {facultyProjects.length === 0 ? (
+              <div className="text-center py-12">
+                <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <div className="text-gray-500">No student projects found.</div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {facultyProjects.map((proj) => (
+                  <div key={proj.id} className="border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+                    <div className="font-semibold text-gray-800 mb-2">{proj.project_title}</div>
+                    <div className="space-y-1 text-sm text-gray-600">
+                      <div><span className="font-medium">Type:</span> {proj.project_type}</div>
+                      <div><span className="font-medium">Status:</span> {proj.status}</div>
+                      <div><span className="font-medium">Semester:</span> {proj.semester || "N/A"}</div>
+                      <div><span className="font-medium">Department:</span> {proj.department || "N/A"}</div>
+                      <div><span className="font-medium">Created:</span> {new Date(proj.created_at).toLocaleDateString()}</div>
+                      <div>
+                        <span className="font-medium">Students:</span>
+                        <ul className="list-disc list-inside ml-4">
+                          {proj.students_involved.map((s, i) => (
+                            <li key={i}>{s}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      {proj.description && (
+                        <div className="mt-2 text-xs text-gray-500">{proj.description}</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -365,46 +442,87 @@ const StudentsDashboard = () => {
         </Card>
       )}
 
-      {/* Top Performers */}
+      {/* Faculty Student Projects Contribution Overview */}
       {analytics.facultyPerformance.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Faculty Project Contribution Overview</CardTitle>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Search className="h-5 w-5 text-gray-600" />
+                  <CardTitle className="text-lg">Faculty Student Projects Contribution Overview</CardTitle>
+                </div>
+                <p className="text-sm text-gray-600 mt-1">Detailed view of all student projects guided by faculty</p>
+              </div>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search faculty..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-colors w-full sm:w-64"
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-2">Rank</th>
-                    <th className="text-left p-2">Name</th>
-                    <th className="text-left p-2">Department</th>
-                    <th className="text-left p-2">Designation</th>
-                    <th className="text-right p-2">Total Projects</th>
-                    <th className="text-right p-2">Recent Projects</th>
-                    <th className="text-left p-2">Latest Project</th>
+                  <tr className="border-b-2 border-gray-200 bg-gray-50">
+                    <th className="text-left p-4 font-semibold text-gray-700">Rank</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Name</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Department</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Designation</th>
+                    <th className="text-right p-4 font-semibold text-gray-700">Total Projects</th>
+                    <th className="text-right p-4 font-semibold text-gray-700">Recent Projects</th>
+                    <th className="text-left p-4 font-semibold text-gray-700">Latest Project</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {analytics.facultyPerformance.slice(0, 20).map((faculty, index) => (
-                    <tr key={faculty.id} className="border-b hover:bg-gray-50">
-                      <td className="p-2 font-bold">{index + 1}</td>
-                      <td className="p-2 font-medium">{faculty.full_name || faculty.email}</td>
-                      <td className="p-2">{faculty.department || 'N/A'}</td>
-                      <td className="p-2">{faculty.designation || 'N/A'}</td>
-                      <td className="p-2 text-right font-semibold text-blue-600">{faculty.project_count}</td>
-                      <td className="p-2 text-right">{faculty.recent_projects}</td>
-                      <td className="p-2 text-sm text-gray-600">
+                  {filteredFacultyPerformance.slice(0, 20).map((faculty, index) => (
+                    <tr
+                      key={faculty.id}
+                      className="border-b border-gray-100 hover:bg-blue-50 cursor-pointer transition-colors"
+                      onClick={() => {
+                        setSelectedFaculty(faculty);
+                        setShowModal(true);
+                      }}
+                    >
+                      <td className="p-4">
+                        <div className="flex items-center justify-center w-8 h-8 bg-blue-100 text-blue-600 rounded-full font-bold text-sm">
+                          {analytics.facultyPerformance.findIndex(f => f.id === faculty.id) + 1}
+                        </div>
+                      </td>
+                      <td className="p-4 font-medium text-gray-800">{faculty.full_name || faculty.email}</td>
+                      <td className="p-4">{faculty.department || 'N/A'}</td>
+                      <td className="p-4">{faculty.designation || 'N/A'}</td>
+                      <td className="p-4 text-right">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {faculty.project_count}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right text-gray-600">{faculty.recent_projects}</td>
+                      <td className="p-4 text-sm text-gray-600">
                         {faculty.latest_project ? new Date(faculty.latest_project).toLocaleDateString() : 'N/A'}
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {filteredFacultyPerformance.length === 0 && searchTerm && (
+                <div className="text-center py-8 text-gray-500">
+                  No faculty found matching "{searchTerm}"
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
       )}
+
+      {/* Modal for project details */}
+      {showModal && <Modal />}
 
       {/* No Data Message */}
       {analytics.totalProjects === 0 && (
