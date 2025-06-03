@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   GraduationCap, 
   BarChart3, 
@@ -20,19 +21,21 @@ import {
   BookOpen,
   Clock,
   Calendar,
-  Presentation
+  Presentation,
+  Menu,
+  X
 } from "lucide-react";
 import FacultyDataView from "@/components/hod/FacultyDataView";
 import ReportsGeneration from "@/components/hod/ReportsGeneration";
 import AwardsDashboard from "@/components/hod/AwardsDashboard";
-import PatentsDashboard from   "@/components/hod/PatentsDashboard";
+import PatentsDashboard from "@/components/hod/PatentsDashboard";
 import PublicationsDashboard from "@/components/hod/PublicationsDashboard";
 import WorkshopsDashboard from "@/components/hod/WorkshopsDashboard";
 import MembershipDashboard from "@/components/hod/MembershipDashboard";
 import TimetableDashboard from "@/components/hod/TimetableDashboard";
 import StudentsDashboard from "@/components/hod/StudentsDashboard";
 import MaterialsDashboard from "@/components/hod/MaterialsDashboard";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Particles from "react-tsparticles";
 import { loadFull } from "tsparticles";
 
@@ -50,6 +53,7 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
   const [recentActivities, setRecentActivities] = useState<
     { type: string; id: string; user_id: string; created_at: string; title: string; faculty: string }[]
   >([]);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const stats = [
     {
@@ -80,6 +84,20 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
       icon: TrendingUp,
       color: "text-orange-600"
     }
+  ];
+
+  const tabItems = [
+    { value: "dashboard", label: "Overview", icon: BarChart3 },
+    { value: "fdp", label: "FDP", icon: Award },
+    { value: "publications", label: "Publications", icon: FileText },
+    { value: "projects", label: "Projects", icon: Briefcase },
+    { value: "patents", label: "Patents", icon: Lightbulb },
+    { value: "workshops", label: "Workshops", icon: Presentation },
+    { value: "awards", label: "Awards", icon: Award },
+    { value: "timetable", label: "Timetable", icon: Clock },
+    { value: "membership", label: "Membership", icon: UserCheck },
+    { value: "students", label: "Students", icon: Users },
+    { value: "materials", label: "Materials", icon: BookOpen }
   ];
 
   // Helper function to get activity icon
@@ -382,6 +400,128 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
   const particlesInit = async (main: any) => {
     await loadFull(main);
   };
+  const MobileSidebar = () => (
+    <AnimatePresence>
+      {isMobileSidebarOpen && (
+        <>
+          {/* Backdrop */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsMobileSidebarOpen(false)}
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          />
+          
+          {/* Sidebar */}
+          <motion.div
+            initial={{ x: "-100%" }}
+            animate={{ x: 0 }}
+            exit={{ x: "-100%" }}
+            transition={{ type: "spring", damping: 25, stiffness: 200 }}
+            className="fixed left-0 top-0 h-full w-80 bg-white shadow-2xl z-50 lg:hidden"
+          >
+            <div className="flex flex-col h-full">
+              {/* Header */}
+              <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-blue-600 to-blue-700">
+                <div className="flex items-center space-x-3">
+                  <GraduationCap className="h-8 w-8 text-white" />
+                  <div>
+                    <h2 className="text-lg font-bold text-white">HOD Portal</h2>
+                    <p className="text-blue-100 text-sm">Navigation</p>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setIsMobileSidebarOpen(false)}
+                  className="text-white hover:bg-blue-600"
+                >
+                  <X className="h-5 w-5" />
+                </Button>
+              </div>
+
+              {/* Navigation Items */}
+              <ScrollArea className="flex-1 p-2">
+                <div className="space-y-1">
+                  {tabItems.map((item) => {
+                    const IconComponent = item.icon;
+                    const isActive = activeTab === item.value;
+                    
+                    return (
+                      <button
+                        key={item.value}
+                        onClick={() => {
+                          setActiveTab(item.value);
+                          setIsMobileSidebarOpen(false);
+                        }}
+                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg text-left transition-all duration-200 ${
+                          isActive
+                            ? "bg-blue-100 text-blue-700 border border-blue-200 shadow-sm"
+                            : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+                        }`}
+                      >
+                        <IconComponent className={`h-5 w-5 flex-shrink-0 ${isActive ? 'text-blue-600' : ''}`} />
+                        <span className="font-medium">{item.label}</span>
+                        {isActive && (
+                          <div className="ml-auto w-2 h-2 bg-blue-600 rounded-full"></div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
+
+              {/* User Info Footer */}
+              <div className="p-4 border-t bg-gray-50">
+                <div className="flex items-center space-x-3 mb-3">
+                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Users className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-sm text-gray-900">{currentUser?.full_name}</p>
+                    <p className="text-xs text-gray-500">Dept. of {currentUser?.department}</p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={onLogout}
+                  className="w-full text-sm"
+                  size="sm"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Logout
+                </Button>
+              </div>
+            </div>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+
+  // Desktop Tab Navigation Component
+  const DesktopTabNavigation = () => (
+    <div className="hidden lg:block">
+      <ScrollArea className="w-full">
+        <TabsList className="inline-flex h-10 items-center justify-start rounded-md bg-muted p-1 text-muted-foreground w-full min-w-max">
+          {tabItems.map((item) => {
+            const IconComponent = item.icon;
+            return (
+              <TabsTrigger
+                key={item.value}
+                value={item.value}
+                className="inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium ring-offset-background transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm min-w-max"
+              >
+                <IconComponent className="h-4 w-4 mr-2 flex-shrink-0" />
+                <span>{item.label}</span>
+              </TabsTrigger>
+            );
+          })}
+        </TabsList>
+      </ScrollArea>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
@@ -437,34 +577,57 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
         }}
       />
 
+      {/* Mobile Sidebar */}
+      <MobileSidebar />
+
       {/* Header */}
       <motion.header 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="relative z-10 bg-white shadow-sm border-b"
+        className="relative z-10 bg-white shadow-sm border-b sticky top-0"
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-3 sm:py-4">
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <GraduationCap className="h-8 w-8 text-blue-600" />
-              <div>
-                <h1 className="text-3xl md:text-4xl font-black text-blue-900 tracking-tight">
+            <div className="flex items-center space-x-2 sm:space-x-3 min-w-0 flex-1">
+              {/* Mobile menu button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsMobileSidebarOpen(true)}
+                className="lg:hidden p-2"
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              
+              <GraduationCap className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 flex-shrink-0" />
+              <div className="min-w-0 flex-1">
+                <h1 className="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-black text-blue-900 tracking-tight truncate">
                   HOD Portal
                 </h1>
-                <div className="flex items-center space-x-2 text-sm text-slate-600">
-                  <span>{currentUser?.full_name || "Loading..."}</span>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-2 text-xs sm:text-sm text-slate-600">
+                  <span className="truncate">{currentUser?.full_name || "Loading..."}</span>
                   {currentUser?.department && (
-                    <span>- Department of {currentUser.department}</span>
+                    <span className="truncate">
+                      <span className="hidden sm:inline">- </span>
+                      Department of {currentUser.department}
+                    </span>
                   )}
                 </div>
               </div>
             </div>
-            <div className="flex items-center space-x-4">
-              <Badge variant="secondary">Head of Department</Badge>
-              <Button variant="outline" onClick={onLogout} className="flex items-center space-x-2">
-                <LogOut className="h-4 w-4" />
-                <span>Logout</span>
+            <div className="flex items-center space-x-2 sm:space-x-4 flex-shrink-0">
+              <Badge variant="secondary" className="hidden sm:inline-flex text-xs">
+                Head of Department
+              </Badge>
+              <Button 
+                variant="outline" 
+                onClick={onLogout} 
+                size="sm"
+                className="hidden lg:flex items-center space-x-1 sm:space-x-2"
+              >
+                <LogOut className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>
@@ -472,36 +635,28 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
       </motion.header>
 
       {/* Main Content */}
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid grid-cols-6 lg:grid-cols-11 w-full bg-white rounded-xl shadow">
-            <TabsTrigger value="dashboard">Overview</TabsTrigger>
-            <TabsTrigger value="fdp">FDP</TabsTrigger>
-            <TabsTrigger value="publications">Publications</TabsTrigger>
-            <TabsTrigger value="projects">Projects</TabsTrigger>
-            <TabsTrigger value="patents">Patents</TabsTrigger>
-            <TabsTrigger value="workshops">Workshops</TabsTrigger>
-            <TabsTrigger value="awards">Awards</TabsTrigger>
-            <TabsTrigger value="timetable">Timetable</TabsTrigger>
-            <TabsTrigger value="membership">Membership</TabsTrigger>
-            <TabsTrigger value="students">Students</TabsTrigger>
-            <TabsTrigger value="materials">Materials</TabsTrigger>
-          </TabsList>
+      <main className="relative z-10 max-w-7xl mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
+          {/* Desktop Navigation */}
+          <DesktopTabNavigation />
 
-          <TabsContent value="dashboard" className="space-y-6">
+          <TabsContent value="dashboard" className="space-y-4 sm:space-y-6">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5 }}
+              className="text-center sm:text-left"
             >
-              <h2 className="text-2xl md:text-3xl font-bold text-blue-900 mb-2">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-900 mb-2">
                 Department Overview
               </h2>
-              <p className="text-slate-600">Monitor and analyze faculty performance and departmental metrics</p>
+              <p className="text-slate-600 text-sm sm:text-base">
+                Monitor and analyze faculty performance and departmental metrics
+              </p>
             </motion.div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
               {stats.map((stat, index) => (
                 <motion.div
                   key={index}
@@ -509,15 +664,17 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.5, delay: index * 0.1 }}
                 >
-                  <Card className="bg-white rounded-2xl shadow-xl">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium text-slate-600">
+                  <Card className="bg-white rounded-xl sm:rounded-2xl shadow-lg hover:shadow-xl transition-shadow">
+                    <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+                      <CardTitle className="text-xs sm:text-sm font-medium text-slate-600 truncate pr-2">
                         {stat.title}
                       </CardTitle>
-                      <stat.icon className={`h-4 w-4 ${stat.color}`} />
+                      <stat.icon className={`h-4 w-4 flex-shrink-0 ${stat.color}`} />
                     </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{stat.value}</div>
+                    <CardContent className="pt-0">
+                      <div className="text-lg sm:text-xl lg:text-2xl font-bold truncate">
+                        {stat.value}
+                      </div>
                       <p className="text-xs text-green-600 mt-1">
                         {stat.change} from last year
                       </p>
@@ -528,87 +685,112 @@ const HODDashboard = ({ onLogout }: HODDashboardProps) => {
             </div>
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <Card className="hover:shadow-2xl transition-shadow cursor-pointer group bg-white rounded-2xl" onClick={() => setActiveTab("faculty-data")}>
-                <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-100 rounded-lg group-hover:scale-110 transition-transform">
-                      <Users className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">View Faculty Data</CardTitle>
-                      <CardDescription>Browse all faculty submissions</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              <Card className="hover:shadow-2xl transition-shadow cursor-pointer group bg-white rounded-2xl" onClick={() => setActiveTab("reports")}>
-                <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-green-100 rounded-lg group-hover:scale-110 transition-transform">
-                      <FileText className="h-5 w-5 text-green-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">Generate Reports</CardTitle>
-                      <CardDescription>Create detailed analytics reports</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
-
-              <Card className="hover:shadow-2xl transition-shadow cursor-pointer group bg-white rounded-2xl" onClick={() => setActiveTab("analytics")}>
-                <CardHeader>
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-purple-100 rounded-lg group-hover:scale-110 transition-transform">
-                      <BarChart3 className="h-5 w-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <CardTitle className="text-lg">View Analytics</CardTitle>
-                      <CardDescription>Statistical insights and trends</CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-              </Card>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+              {[
+                {
+                  title: "View Faculty Data",
+                  description: "Browse all faculty submissions",
+                  icon: Users,
+                  color: "blue",
+                  tab: "fdp"
+                },
+                {
+                  title: "Generate Reports", 
+                  description: "Create detailed analytics reports",
+                  icon: FileText,
+                  color: "green",
+                  tab: "projects"
+                },
+                {
+                  title: "View Analytics",
+                  description: "Statistical insights and trends", 
+                  icon: BarChart3,
+                  color: "purple",
+                  tab: "publications"
+                }
+              ].map((action, index) => (
+                <motion.div
+                  key={index}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.5, delay: 0.4 + index * 0.1 }}
+                >
+                  <Card 
+                    className="hover:shadow-xl transition-all duration-300 cursor-pointer group bg-white rounded-xl sm:rounded-2xl border hover:border-slate-300" 
+                    onClick={() => setActiveTab(action.tab)}
+                  >
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start space-x-3">
+                        <div className={`p-2 bg-${action.color}-100 rounded-lg group-hover:scale-110 transition-transform flex-shrink-0`}>
+                          <action.icon className={`h-4 w-4 sm:h-5 sm:w-5 text-${action.color}-600`} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <CardTitle className="text-sm sm:text-base lg:text-lg font-semibold leading-tight">
+                            {action.title}
+                          </CardTitle>
+                          <CardDescription className="text-xs sm:text-sm mt-1 line-clamp-2">
+                            {action.description}
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                  </Card>
+                </motion.div>
+              ))}
             </div>
 
             {/* Recent Activity */}
-            <Card className="bg-white rounded-2xl shadow-xl">
-              <CardHeader>
-                <CardTitle>Recent Faculty Activity</CardTitle>
-                <CardDescription>Latest submissions and updates across all categories</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {recentActivities.length === 0 && (
-                    <div className="text-slate-500 text-center py-8">No recent activity</div>
-                  )}
-                  {recentActivities.map((activity, idx) => {
-                    const IconComponent = getActivityIcon(activity.type);
-                    const colorClass = getActivityColor(activity.type);
-                    
-                    return (
-                      <div key={activity.type + activity.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div className={`p-2 rounded-full ${colorClass}`}>
-                            <IconComponent className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{activity.faculty}</p>
-                            <p className="text-sm text-slate-600">
-                              Added {activity.type.toLowerCase()}: {activity.title}
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-xs text-slate-500">
-                          {new Date(activity.created_at).toLocaleString()}
-                        </span>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.7 }}
+            >
+              <Card className="bg-white rounded-xl sm:rounded-2xl shadow-lg">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base sm:text-lg lg:text-xl">Recent Faculty Activity</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm">
+                    Latest submissions and updates across all categories
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 sm:space-y-4">
+                    {recentActivities.length === 0 && (
+                      <div className="text-slate-500 text-center py-6 sm:py-8 text-sm sm:text-base">
+                        No recent activity
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+                    )}
+                    {recentActivities.map((activity, idx) => {
+                      const IconComponent = getActivityIcon(activity.type);
+                      const colorClass = getActivityColor(activity.type);
+                      
+                      return (
+                        <div key={activity.type + activity.id} className="flex items-start justify-between p-3 sm:p-4 bg-slate-50 rounded-lg gap-3">
+                          <div className="flex items-start space-x-3 min-w-0 flex-1">
+                            <div className={`p-2 rounded-full ${colorClass} flex-shrink-0`}>
+                              <IconComponent className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="font-medium text-sm sm:text-base truncate">
+                                {activity.faculty}
+                              </p>
+                              <p className="text-xs sm:text-sm text-slate-600 line-clamp-2">
+                                Added {activity.type.toLowerCase()}: {activity.title}
+                              </p>
+                            </div>
+                          </div>
+                          <span className="text-xs text-slate-500 flex-shrink-0 mt-1">
+                            {new Date(activity.created_at).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           </TabsContent>
 
           <TabsContent value="fdp">
