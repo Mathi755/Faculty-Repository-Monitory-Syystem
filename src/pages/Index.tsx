@@ -143,29 +143,31 @@ const Index = () => {
         </div>
       </main>
 
-      <style jsx>{`
-        @keyframes gentleFloat {
-          0%, 100% { 
-            transform: translateY(0px) translateX(0px); 
-            opacity: 0.6;
+      <style>
+        {`
+          @keyframes gentleFloat {
+            0%, 100% { 
+              transform: translateY(0px) translateX(0px); 
+              opacity: 0.6;
+            }
+            50% { 
+              transform: translateY(-15px) translateX(10px); 
+              opacity: 1;
+            }
           }
-          50% { 
-            transform: translateY(-15px) translateX(10px); 
-            opacity: 1;
+          
+          @keyframes twinkle {
+            0%, 100% { 
+              opacity: 0.3;
+              transform: scale(1);
+            }
+            50% { 
+              opacity: 1;
+              transform: scale(1.2);
+            }
           }
-        }
-        
-        @keyframes twinkle {
-          0%, 100% { 
-            opacity: 0.3;
-            transform: scale(1);
-          }
-          50% { 
-            opacity: 1;
-            transform: scale(1.2);
-          }
-        }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };
